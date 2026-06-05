@@ -1,0 +1,298 @@
+{
+  "name": "FREE OCR RECEIPT TELEGRAM TO LARAVEL",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram_credential",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{$json[\"message\"][\"photo\"][0][\"file_id\"]}}"
+      },
+      "id": "get-telegram-file",
+      "name": "Get Telegram File",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram_credential",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/file/botYOUR_BOT_TOKEN/{{$json[\"file_path\"]}}",
+        "responseFormat": "file",
+        "dataPropertyName": "receipt"
+      },
+      "id": "download-receipt",
+      "name": "Download Receipt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "binaryToJson",
+        "options": {}
+      },
+      "id": "move-binary-data",
+      "name": "Move Binary Data",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "typeVersion": 1,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "mkdir -p /tmp/receipts && echo '{{$json[\"data\"]}}' | base64 -d > /tmp/receipts/receipt.jpg && tesseract /tmp/receipts/receipt.jpg stdout"
+      },
+      "id": "execute-command",
+      "name": "Execute Command OCR",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const text = items[0].json.stdout || '';\n\nconst lines = text\n  .split('\\n')\n  .map(l => l.trim())\n  .filter(l => l !== '');\n\nlet itemsArray = [];\nlet total = 0;\n\nfor (const line of lines) {\n  const match = line.match(/(.+?)\\s+(\\d+[\\.,]?\\d*)$/);\n\n  if (match) {\n    const name = match[1].trim();\n    const price = parseInt(match[2].replace(/[^0-9]/g, '')) || 0;\n\n    if (name.length > 2 && price > 0) {\n      itemsArray.push({\n        name,\n        price\n      });\n\n      total += price;\n    }\n  }\n}\n\nreturn [\n  {\n    json: {\n      store_name: 'Unknown Store',\n      receipt_date: new Date().toISOString(),\n      total_price: total,\n      total_items: itemsArray.length,\n      items: itemsArray,\n      raw_text: text\n    }\n  }\n];"
+      },
+      "id": "parse-json",
+      "name": "Parse Receipt JSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"total_price\"]}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "validate-receipt",
+      "name": "Validate Receipt",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://yourdomain.com/api/receipts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "send-laravel",
+      "name": "Send To Laravel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1750,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "text": "=✅ Receipt berhasil diproses\\n\\n💰 Total: Rp {{$json[\"total_price\"]}}\\n🛒 Total Item: {{$json[\"total_items\"]}}"
+      },
+      "id": "telegram-success",
+      "name": "Telegram Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram_credential",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "text": "❌ Receipt gagal diproses atau OCR tidak dapat membaca struk."
+      },
+      "id": "telegram-failed",
+      "name": "Telegram Failed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1750,
+        450
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram_credential",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Telegram File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Telegram File": {
+      "main": [
+        [
+          {
+            "node": "Download Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Receipt": {
+      "main": [
+        [
+          {
+            "node": "Move Binary Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move Binary Data": {
+      "main": [
+        [
+          {
+            "node": "Execute Command OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command OCR": {
+      "main": [
+        [
+          {
+            "node": "Parse Receipt JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Receipt JSON": {
+      "main": [
+        [
+          {
+            "node": "Validate Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Receipt": {
+      "main": [
+        [
+          {
+            "node": "Send To Laravel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send To Laravel": {
+      "main": [
+        [
+          {
+            "node": "Telegram Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "free-ocr-receipt-workflow-v2"
+}
