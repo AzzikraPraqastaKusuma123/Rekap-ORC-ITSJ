@@ -121,7 +121,8 @@ class ProcessReceiptOCRJob implements ShouldQueue
             // Rebuild cache
             $analyticsService->getDashboardStats();
 
-            $editUrl = rtrim(env('APP_URL', 'http://localhost'), '/') . '/receipts?edit=' . $receipt->id;
+            $hash = hash_hmac('sha256', $receipt->id . $code, env('APP_KEY'));
+            $editUrl = rtrim(env('APP_URL', 'http://localhost'), '/') . "/receipts/{$receipt->id}/telegram-edit/{$hash}";
 
             // 5. Send rich reply message to Telegram Chat
             $message = "✅ <b>Receipt Berhasil Diproses!</b>\n\n";
@@ -143,11 +144,26 @@ class ProcessReceiptOCRJob implements ShouldQueue
                 $message .= "\n";
             }
 
-            $message .= "✏️ <b>Edit/Koreksi Data:</b>\n";
-            $message .= "<a href=\"{$editUrl}\">Klik di sini untuk mengedit data struk jika tidak sesuai</a>\n\n";
+            $message .= "✏️ <b>Data Tidak Sesuai?</b>\n";
+            $message .= "Silakan klik tombol di bawah ini untuk mengedit data secara langsung di Telegram.\n\n";
             $message .= "🌐 Buka dashboard admin Anda untuk melihat grafik analytics realtime!";
 
-            $telegramService->sendReply($this->telegramChatId, $this->telegramMessageId, $message);
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => '✏️ Edit Langsung di Telegram',
+                            'web_app' => [
+                                'url' => $editUrl
+                            ]
+                        ]
+                    ]
+                ]
+            ];
+
+            $telegramService->sendReply($this->telegramChatId, $this->telegramMessageId, $message, [
+                'reply_markup' => json_encode($keyboard)
+            ]);
         } catch (\Exception $e) {
             Log::error("Failed to save OCR receipt to database: " . $e->getMessage());
             

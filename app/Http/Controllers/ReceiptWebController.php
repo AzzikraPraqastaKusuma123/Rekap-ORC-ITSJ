@@ -319,4 +319,88 @@ class ReceiptWebController extends Controller
             file_put_contents($envFile, $content);
         }
     }
+
+    /**
+     * Show the receipt edit form specifically for Telegram WebApp (no login required).
+     */
+    public function telegramEdit($id, $hash)
+    {
+        try {
+            $receipt = $this->receiptRepository->find((int)$id)->load('items');
+            
+            // Verify hash
+            $expectedHash = hash_hmac('sha256', $receipt->id . $receipt->receipt_code, env('APP_KEY'));
+            if (!hash_equals($expectedHash, $hash)) {
+                abort(403, 'Unauthorized edit signature');
+            }
+
+            return view('receipts.telegram-edit', compact('receipt', 'hash'));
+        } catch (\Exception $e) {
+            abort(404, 'Receipt not found');
+        }
+    }
+
+    /**
+     * Save the receipt edit from Telegram WebApp.
+     */
+    public function telegramUpdate(Request $request, $id, $hash)
+    {
+        try {
+            $receipt = $this->receiptRepository->find((int)$id);
+            
+            // Verify hash
+            $expectedHash = hash_hmac('sha256', $receipt->id . $receipt->receipt_code, env('APP_KEY'));
+            if (!hash_equals($expectedHash, $hash)) {
+                abort(403, 'Unauthorized edit signature');
+            }
+
+            $request->validate([
+                'store_name' => 'required|string|max:255',
+                'receipt_date' => 'required|date',
+                'total_price' => 'required|numeric',
+                'items' => 'required|array',
+                'items.*.item_name' => 'required|string|max:255',
+                'items.*.price' => 'required|numeric',
+                'items.*.qty' => 'required|integer|min:1',
+            ]);
+
+            $itemsData = [];
+            $computedTotal = 0;
+            
+            foreach ($request->items as $item) {
+                $subtotal = $item['price'] * $item['qty'];
+                $computedTotal += $subtotal;
+                $itemsData[] = [
+                    'item_name' => $item['item_name'],
+                    'price' => $item['price'],
+                    'qty' => $item['qty'],
+                    'subtotal' => $subtotal
+                ];
+            }
+
+            $totalPrice = $request->input('total_price') ?: $computedTotal;
+
+            $data = [
+                'store_name' => $request->input('store_name'),
+                'receipt_date' => $request->input('receipt_date'),
+                'total_price' => $totalPrice,
+            ];
+
+            $this->receiptRepository->update((int)$id, $data, $itemsData);
+
+            // Rebuild analytics cache
+            $this->analyticsService->getDashboardStats();
+
+            // Log activity
+            \App\Models\ActivityLog::create([
+                'user_id' => $receipt->created_by ?: 1,
+                'activity' => 'Telegram WebApp Verification',
+                'description' => "Receipt {$receipt->receipt_code} updated/verified directly via Telegram WebApp."
+            ]);
+
+            return view('receipts.telegram-success');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to update receipt: ' . $e->getMessage());
+        }
+    }
 }

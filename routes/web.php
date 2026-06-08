@@ -11,6 +11,10 @@ Route::get('/', function () {
 // Telegram Webhook Endpoint
 Route::post('/api/telegram/webhook', [\App\Http\Controllers\Api\TelegramWebhookController::class, 'handle']);
 
+// Telegram WebApp direct edit routes (secured via secret hash)
+Route::get('/receipts/{id}/telegram-edit/{hash}', [\App\Http\Controllers\ReceiptWebController::class, 'telegramEdit'])->name('receipts.telegram-edit');
+Route::post('/receipts/{id}/telegram-edit/{hash}', [\App\Http\Controllers\ReceiptWebController::class, 'telegramUpdate'])->name('receipts.telegram-update');
+
 
 use App\Http\Controllers\ReceiptWebController;
 

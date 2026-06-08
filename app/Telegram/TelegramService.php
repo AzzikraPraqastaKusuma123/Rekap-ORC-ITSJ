@@ -46,14 +46,11 @@ class TelegramService
         }
     }
 
-    /**
-     * Send a reply to a specific user message.
-     */
-    public function sendReply(string|int $chatId, int $messageId, string $text): bool
+    public function sendReply(string|int $chatId, int $messageId, string $text, array $extraOptions = []): bool
     {
-        return $this->sendMessage($chatId, $text, [
+        return $this->sendMessage($chatId, $text, array_merge([
             'reply_to_message_id' => $messageId
-        ]);
+        ], $extraOptions));
     }
 
     /**

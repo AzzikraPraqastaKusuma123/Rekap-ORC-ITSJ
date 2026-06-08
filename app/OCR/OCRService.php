@@ -20,6 +20,12 @@ class OCRService
             return $this->getEmptyResult("Image file not found");
         }
 
+        // Use Anthropic if key is configured
+        $anthropicKey = env('ANTHROPIC_API_KEY');
+        if (!empty($anthropicKey) && $anthropicKey !== 'YOUR_ANTHROPIC_KEY_HERE') {
+            return $this->processWithAnthropic($imagePath, $anthropicKey);
+        }
+
         // Use OpenAI if key is configured
         $openaiKey = env('OPENAI_API_KEY');
         if (!empty($openaiKey) && $openaiKey !== 'YOUR_OPENAI_KEY_HERE') {
@@ -32,6 +38,132 @@ class OCRService
             return $this->processWithGemini($imagePath, $geminiKey);
         }
 
+        return $this->processWithTesseract($imagePath);
+    }
+
+    /**
+     * Process image via Anthropic Claude API.
+     */
+    private function processWithAnthropic(string $imagePath, string $apiKey): array
+    {
+        Log::info("Processing receipt with Anthropic Claude API: {$imagePath}");
+        
+        try {
+            $imageData = base64_encode(file_get_contents($imagePath));
+            
+            // Get mime type of the image
+            $mimeType = 'image/jpeg';
+            if (function_exists('mime_content_type')) {
+                $mimeType = @mime_content_type($imagePath) ?: 'image/jpeg';
+            } else {
+                $pathInfo = pathinfo($imagePath);
+                $ext = strtolower($pathInfo['extension'] ?? '');
+                if ($ext === 'png') {
+                    $mimeType = 'image/png';
+                } elseif ($ext === 'webp') {
+                    $mimeType = 'image/webp';
+                }
+            }
+            
+            $prompt = "Identify the receipt/struk belanja details and return a clean JSON object.
+Ensure the output matches this exact JSON structure:
+{
+  \"store_name\": \"Name of the store/merchant (e.g. ALFAMART, INDOMARET, etc. in uppercase)\",
+  \"receipt_date\": \"Date on the receipt in YYYY-MM-DD format (if not found, use today's date)\",
+  \"total_price\": numeric_total_price (e.g. 45000),
+  \"items\": [
+    {
+      \"item_name\": \"Item description\",
+      \"price\": numeric_unit_price,
+      \"qty\": numeric_quantity,
+      \"subtotal\": numeric_subtotal
+    }
+  ],
+  \"raw_text\": \"All readable text on the receipt\"
+}
+
+Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string matching the schema.";
+
+            $model = env('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022');
+
+            $response = Http::timeout(30)
+                ->withHeaders([
+                    'x-api-key' => $apiKey,
+                    'anthropic-version' => '2023-06-01',
+                    'content-type' => 'application/json'
+                ])
+                ->post("https://api.anthropic.com/v1/messages", [
+                    'model' => $model,
+                    'max_tokens' => 1024,
+                    'messages' => [
+                        [
+                            'role' => 'user',
+                            'content' => [
+                                [
+                                    'type' => 'text',
+                                    'text' => $prompt
+                                ],
+                                [
+                                    'type' => 'image',
+                                    'source' => [
+                                        'type' => 'base64',
+                                        'media_type' => $mimeType,
+                                        'data' => $imageData
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]);
+
+            if ($response->successful()) {
+                $resultText = $response->json('content.0.text');
+                Log::info("Anthropic Raw Response: " . $resultText);
+                
+                $parsedJson = json_decode(trim($resultText), true);
+                
+                if (json_last_error() === JSON_ERROR_NONE && isset($parsedJson['store_name'])) {
+                    $parsedJson['success'] = true;
+                    $parsedJson['message'] = 'Receipt successfully parsed via Anthropic Claude API';
+                    
+                    // Guarantee fields exist
+                    if (!isset($parsedJson['total_price'])) {
+                        $parsedJson['total_price'] = 0;
+                    }
+                    if (!isset($parsedJson['receipt_date'])) {
+                        $parsedJson['receipt_date'] = Carbon::today()->toDateString();
+                    }
+                    if (!isset($parsedJson['items'])) {
+                        $parsedJson['items'] = [];
+                    }
+                    if (!isset($parsedJson['raw_text'])) {
+                        $parsedJson['raw_text'] = '';
+                    }
+                    
+                    return $parsedJson;
+                }
+                
+                Log::warning("Anthropic did not return a valid JSON: " . $resultText);
+            } else {
+                Log::error("Anthropic API call failed with status " . $response->status() . ": " . $response->body());
+            }
+        } catch (\Exception $e) {
+            Log::error("Exception in Anthropic processing: " . $e->getMessage());
+        }
+
+        // Fallback to OpenAI if Anthropic fails
+        Log::warning("Anthropic API failed, trying OpenAI as fallback");
+        
+        $openaiKey = env('OPENAI_API_KEY');
+        if (!empty($openaiKey) && $openaiKey !== 'YOUR_OPENAI_KEY_HERE') {
+            return $this->processWithOpenAI($imagePath, $openaiKey);
+        }
+        
+        $geminiKey = env('GEMINI_API_KEY');
+        if (!empty($geminiKey) && $geminiKey !== 'YOUR_GEMINI_KEY_HERE') {
+            return $this->processWithGemini($imagePath, $geminiKey);
+        }
+        
         return $this->processWithTesseract($imagePath);
     }
 
