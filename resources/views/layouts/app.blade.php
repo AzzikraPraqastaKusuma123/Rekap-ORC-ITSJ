@@ -50,33 +50,54 @@
             
             /* Theme Dependent Card Styles */
             html.dark .glass-card {
-                background: rgba(15, 23, 42, 0.45);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                border: 1px solid rgba(255, 255, 255, 0.04);
+                background: rgba(10, 15, 30, 0.5);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4);
             }
             html.light .glass-card {
-                background: rgba(255, 255, 255, 0.7);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                border: 1px solid rgba(15, 23, 42, 0.06);
-                box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+                background: rgba(255, 255, 255, 0.75);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+                border: 1px solid rgba(15, 23, 42, 0.05);
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
             }
             
             html.dark .glass-card-hover:hover {
-                background: rgba(15, 23, 42, 0.65);
-                border-color: rgba(59, 130, 246, 0.2);
-                box-shadow: 0 0 25px rgba(59, 130, 246, 0.08);
+                background: rgba(15, 23, 42, 0.7);
+                border-color: rgba(59, 130, 246, 0.25);
+                box-shadow: 0 15px 35px rgba(59, 130, 246, 0.1);
             }
             html.light .glass-card-hover:hover {
-                background: rgba(255, 255, 255, 0.85);
-                border-color: rgba(59, 130, 246, 0.15);
-                box-shadow: 0 10px 30px rgba(59, 130, 246, 0.06);
+                background: rgba(255, 255, 255, 0.9);
+                border-color: rgba(59, 130, 246, 0.2);
+                box-shadow: 0 12px 35px rgba(59, 130, 246, 0.08);
+            }
+
+            /* Sidebar active states glow markers */
+            html.dark nav a.bg-blue-600\/10 {
+                position: relative;
+                background-color: rgba(59, 130, 246, 0.08);
+                border-color: rgba(59, 130, 246, 0.25) !important;
+                color: #60a5fa !important;
+                box-shadow: inset 0 0 15px rgba(59, 130, 246, 0.05);
+            }
+            html.dark nav a.bg-blue-600\/10::before {
+                content: '';
+                position: absolute;
+                left: -1px;
+                top: 25%;
+                height: 50%;
+                width: 4.5px;
+                border-radius: 9999px;
+                background-color: #3b82f6;
+                box-shadow: 0 0 10px #3b82f6, 0 0 20px #3b82f6;
             }
 
             /* Sidebar background */
             html.dark aside {
-                background-color: rgba(9, 13, 22, 0.95);
+                background-color: rgba(7, 10, 18, 0.96);
             }
             html.light aside {
                 background-color: #ffffff;

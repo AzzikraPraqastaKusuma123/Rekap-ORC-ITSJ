@@ -2,7 +2,7 @@
 
     <!-- Header Section -->
     <div class="mb-8">
-        <h1 class="text-3xl font-extrabold text-white tracking-tight">Pengaturan Sistem</h1>
+        <h1 class="text-3xl font-black tracking-tight font-display bg-gradient-to-r from-white via-slate-200 to-blue-400 bg-clip-text text-transparent">Pengaturan Sistem</h1>
         <p class="text-sm text-slate-400 mt-1">Konfigurasikan kredensial Bot Telegram, direktori lokal Tesseract OCR, serta integrasi ID akun pengguna.</p>
     </div>
 

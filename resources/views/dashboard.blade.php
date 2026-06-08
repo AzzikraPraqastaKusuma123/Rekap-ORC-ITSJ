@@ -6,7 +6,7 @@
 
     <!-- Header Greeting Section -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-white tracking-tight font-display">Ikhtisar Keuangan</h1>
+        <h1 class="text-3xl font-black tracking-tight font-display bg-gradient-to-r from-white via-slate-200 to-blue-400 bg-clip-text text-transparent">Ikhtisar Keuangan</h1>
         <p class="text-sm text-slate-400 mt-1">Laporan terpadu hasil ekstraksi data struk belanja digital secara instan.</p>
     </div>
 
@@ -14,11 +14,12 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
         <!-- Card: Spent Today -->
-        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-slate-700/80 group">
+        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-blue-500/30 group">
+            <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-600 shadow-[0_2px_10px_#3b82f6]"></div>
             <span class="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10"></span>
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="text-xs font-bold text-slate-400 tracking-wider uppercase font-display">Hari Ini</span>
-                <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -44,11 +45,12 @@
         </div>
 
         <!-- Card: Spent This Week -->
-        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-slate-700/80 group">
+        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-purple-500/30 group">
+            <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-purple-500 via-pink-400 to-purple-600 shadow-[0_2px_10px_#8b5cf6]"></div>
             <span class="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10"></span>
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="text-xs font-bold text-slate-400 tracking-wider uppercase font-display">Minggu Ini</span>
-                <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 border border-purple-500/20">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -74,11 +76,12 @@
         </div>
 
         <!-- Card: Spent This Month -->
-        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-slate-700/80 group">
+        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-cyan-500/30 group">
+            <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-cyan-500 via-teal-400 to-cyan-600 shadow-[0_2px_10px_#06b6d4]"></div>
             <span class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10"></span>
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="text-xs font-bold text-slate-400 tracking-wider uppercase font-display">Bulan Ini</span>
-                <div class="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 border border-cyan-500/20">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
                     </svg>
@@ -104,11 +107,12 @@
         </div>
 
         <!-- Card: Spent This Year -->
-        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-slate-700/80 group">
+        <div class="glass-card rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:border-emerald-500/30 group">
+            <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 shadow-[0_2px_10px_#10b981]"></div>
             <span class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10"></span>
             <div class="flex items-center justify-between mb-4 relative z-10">
                 <span class="text-xs font-bold text-slate-400 tracking-wider uppercase font-display">Tahun Ini</span>
-                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.252.58 1.802l-3.97 2.887a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.971-2.887a1 1 0 00-1.176 0l-3.97 2.887c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.97-2.887c-.78-.55-.38-1.81.58-1.802h4.907a1 1 0 00.95-.69l1.519-4.674z" />
                     </svg>

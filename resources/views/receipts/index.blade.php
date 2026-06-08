@@ -3,7 +3,7 @@
     <!-- Title and Action Bar -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-            <h1 class="text-3xl font-extrabold text-white tracking-tight">Riwayat Struk Belanja</h1>
+            <h1 class="text-3xl font-black tracking-tight font-display bg-gradient-to-r from-white via-slate-200 to-blue-400 bg-clip-text text-transparent">Riwayat Struk Belanja</h1>
             <p class="text-sm text-slate-400 mt-1">Kelola, verifikasi, koreksi, dan ekspor riwayat struk belanja Anda.</p>
         </div>
         
@@ -96,6 +96,17 @@
                         <img src="{{ asset('storage/' . $receipt->receipt_image) }}" alt="Receipt" 
                              class="w-full h-full object-cover object-top transition duration-500 group-hover:scale-105" loading="lazy">
                         
+                        <!-- Floating Status Badge -->
+                        @if($receipt->total_price == 0 || $receipt->items->count() == 0)
+                            <div class="absolute top-3 left-3 bg-amber-500/90 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-md flex items-center gap-1 shadow-md animate-pulse">
+                                ⚠️ Perlu Koreksi
+                            </div>
+                        @else
+                            <div class="absolute top-3 left-3 bg-emerald-500/90 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-md flex items-center gap-1 shadow-md">
+                                ✓ Terverifikasi
+                            </div>
+                        @endif
+
                         <!-- Floating Date Stamp -->
                         <div class="absolute bottom-3 left-3 bg-slate-950/70 backdrop-blur border border-white/5 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide text-white">
                             {{ Carbon\Carbon::parse($receipt->receipt_date)->translatedFormat('d M Y') }}
@@ -124,7 +135,27 @@
                             </div>
                             
                             <!-- Items counts -->
-                            <p class="text-xs text-slate-400 font-semibold mb-4">{{ $receipt->items->count() }} item belanjaan</p>
+                            <p class="text-xs text-slate-400 font-bold mb-2">{{ $receipt->items->count() }} item belanjaan</p>
+
+                            <!-- Items Preview List -->
+                            @if($receipt->items->count() > 0)
+                                <div class="space-y-1 mb-4 bg-slate-950/20 p-2.5 rounded-xl border border-slate-800/40">
+                                    @foreach($receipt->items->take(2) as $item)
+                                        <div class="flex items-center justify-between text-[11px] text-slate-400 gap-2">
+                                            <span class="truncate max-w-[120px]">{{ $item->item_name }}</span>
+                                            <span class="font-mono text-slate-500 shrink-0">{{ $item->qty }}x - Rp {{ number_format($item->subtotal, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endforeach
+                                    @if($receipt->items->count() > 2)
+                                        <div class="text-[9px] text-blue-400 font-bold pt-1">+ {{ $receipt->items->count() - 2 }} item lainnya...</div>
+                                    @endif
+                                </div>
+                            @else
+                                <div class="text-[11px] text-amber-500 font-bold mb-4 flex items-center gap-1.5 bg-amber-500/5 p-2.5 rounded-xl border border-amber-500/10">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                    Belum ada rincian barang.
+                                </div>
+                            @endif
                         </div>
 
                         <div class="flex items-center justify-between pt-4 border-t border-slate-800/40 shrink-0">
