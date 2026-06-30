@@ -39,13 +39,13 @@ class ReceiptRepository implements ReceiptRepositoryInterface
         }
 
         // Sorting
-        $sortBy = $filters['sort_by'] ?? 'receipt_date';
+        $sortBy = $filters['sort_by'] ?? 'created_at';
         $sortOrder = $filters['sort_order'] ?? 'desc';
         
-        if (in_array($sortBy, ['receipt_date', 'total_price', 'created_at'])) {
+        if (in_array($sortBy, ['receipt_date', 'total_price', 'created_at', 'store_name'])) {
             $query->orderBy($sortBy, $sortOrder);
         } else {
-            $query->orderBy('receipt_date', 'desc');
+            $query->orderBy('created_at', 'desc');
         }
 
         return $query->paginate($perPage);
@@ -70,6 +70,7 @@ class ReceiptRepository implements ReceiptRepositoryInterface
             foreach ($items as $item) {
                 $receipt->items()->create([
                     'item_name' => $item['item_name'],
+                    'category' => $item['category'] ?? null,
                     'price' => $item['price'],
                     'qty' => $item['qty'] ?? 1,
                     'subtotal' => $item['subtotal'] ?? ($item['price'] * ($item['qty'] ?? 1)),
@@ -96,6 +97,7 @@ class ReceiptRepository implements ReceiptRepositoryInterface
                 foreach ($items as $item) {
                     $receipt->items()->create([
                         'item_name' => $item['item_name'],
+                        'category' => $item['category'] ?? null,
                         'price' => $item['price'],
                         'qty' => $item['qty'] ?? 1,
                         'subtotal' => $item['subtotal'] ?? ($item['price'] * ($item['qty'] ?? 1)),
@@ -135,8 +137,7 @@ class ReceiptRepository implements ReceiptRepositoryInterface
      */
     public function getRecent(int $limit = 5)
     {
-        return Receipt::orderBy('receipt_date', 'desc')
-            ->orderBy('created_at', 'desc')
+        return Receipt::orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();
     }

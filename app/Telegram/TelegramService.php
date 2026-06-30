@@ -118,4 +118,23 @@ class TelegramService
             return false;
         }
     }
+
+    /**
+     * Broadcast a message to all Admins who have linked their Telegram chat ID.
+     */
+    public function notifyAdmins(string $message, array $extraOptions = []): void
+    {
+        // Import User model if not already (assuming global namespace access or we can use \App\Models\User)
+        $admins = \App\Models\User::where(function($query) {
+            $query->where('role', 'admin')
+                  ->orWhere('role', 'superadmin');
+        })
+        ->whereNotNull('telegram_chat_id')
+        ->where('telegram_chat_id', '!=', '')
+        ->get();
+
+        foreach ($admins as $admin) {
+            $this->sendMessage($admin->telegram_chat_id, $message, $extraOptions);
+        }
+    }
 }

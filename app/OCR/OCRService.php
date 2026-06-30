@@ -20,268 +20,19 @@ class OCRService
             return $this->getEmptyResult("Image file not found");
         }
 
-        // Use Anthropic if key is configured
-        $anthropicKey = env('ANTHROPIC_API_KEY');
-        if (!empty($anthropicKey) && $anthropicKey !== 'YOUR_ANTHROPIC_KEY_HERE') {
-            return $this->processWithAnthropic($imagePath, $anthropicKey);
-        }
-
-        // Use OpenAI if key is configured
-        $openaiKey = env('OPENAI_API_KEY');
-        if (!empty($openaiKey) && $openaiKey !== 'YOUR_OPENAI_KEY_HERE') {
-            return $this->processWithOpenAI($imagePath, $openaiKey);
-        }
 
         // Use Gemini AI if key is configured
         $geminiKey = env('GEMINI_API_KEY');
         if (!empty($geminiKey) && $geminiKey !== 'YOUR_GEMINI_KEY_HERE') {
-            return $this->processWithGemini($imagePath, $geminiKey);
-        }
-
-        return $this->processWithTesseract($imagePath);
-    }
-
-    /**
-     * Process image via Anthropic Claude API.
-     */
-    private function processWithAnthropic(string $imagePath, string $apiKey): array
-    {
-        Log::info("Processing receipt with Anthropic Claude API: {$imagePath}");
-        
-        try {
-            $imageData = base64_encode(file_get_contents($imagePath));
-            
-            // Get mime type of the image
-            $mimeType = 'image/jpeg';
-            if (function_exists('mime_content_type')) {
-                $mimeType = @mime_content_type($imagePath) ?: 'image/jpeg';
+            if (!\Illuminate\Support\Facades\Cache::get('gemini_quota_exhausted')) {
+                return $this->processWithGemini($imagePath, $geminiKey);
             } else {
-                $pathInfo = pathinfo($imagePath);
-                $ext = strtolower($pathInfo['extension'] ?? '');
-                if ($ext === 'png') {
-                    $mimeType = 'image/png';
-                } elseif ($ext === 'webp') {
-                    $mimeType = 'image/webp';
-                }
+                // SPAM NOTIFICATION UNTIL UPDATED
+                app(\App\Telegram\TelegramService::class)->notifyAdmins("🚨 <b>SPAM Peringatan Kritis!</b>\n\nKuota Google Gemini AI Anda <b>HABIS</b>! Ada struk masuk yang terpaksa di-scan menggunakan mode Offline (Tesseract) dengan akurasi rendah.\n\n<b>HARAP SEGERA</b> perbarui API Key Anda di menu Pengaturan Dashboard untuk menghentikan pesan ini dan mengembalikan performa AI!");
+                Log::warning("Gemini Quota Exhausted! Spam notification sent to admin.");
             }
-            
-            $prompt = "Identify the receipt/struk belanja details and return a clean JSON object.
-Ensure the output matches this exact JSON structure:
-{
-  \"store_name\": \"Name of the store/merchant (e.g. ALFAMART, INDOMARET, etc. in uppercase)\",
-  \"receipt_date\": \"Date on the receipt in YYYY-MM-DD format (if not found, use today's date)\",
-  \"total_price\": numeric_total_price (e.g. 45000),
-  \"items\": [
-    {
-      \"item_name\": \"Item description\",
-      \"price\": numeric_unit_price,
-      \"qty\": numeric_quantity,
-      \"subtotal\": numeric_subtotal
-    }
-  ],
-  \"raw_text\": \"All readable text on the receipt\"
-}
-
-Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string matching the schema.";
-
-            $model = env('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022');
-
-            $response = Http::timeout(30)
-                ->withHeaders([
-                    'x-api-key' => $apiKey,
-                    'anthropic-version' => '2023-06-01',
-                    'content-type' => 'application/json'
-                ])
-                ->post("https://api.anthropic.com/v1/messages", [
-                    'model' => $model,
-                    'max_tokens' => 1024,
-                    'messages' => [
-                        [
-                            'role' => 'user',
-                            'content' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => $prompt
-                                ],
-                                [
-                                    'type' => 'image',
-                                    'source' => [
-                                        'type' => 'base64',
-                                        'media_type' => $mimeType,
-                                        'data' => $imageData
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]);
-
-            if ($response->successful()) {
-                $resultText = $response->json('content.0.text');
-                Log::info("Anthropic Raw Response: " . $resultText);
-                
-                $parsedJson = json_decode(trim($resultText), true);
-                
-                if (json_last_error() === JSON_ERROR_NONE && isset($parsedJson['store_name'])) {
-                    $parsedJson['success'] = true;
-                    $parsedJson['message'] = 'Receipt successfully parsed via Anthropic Claude API';
-                    
-                    // Guarantee fields exist
-                    if (!isset($parsedJson['total_price'])) {
-                        $parsedJson['total_price'] = 0;
-                    }
-                    if (!isset($parsedJson['receipt_date'])) {
-                        $parsedJson['receipt_date'] = Carbon::today()->toDateString();
-                    }
-                    if (!isset($parsedJson['items'])) {
-                        $parsedJson['items'] = [];
-                    }
-                    if (!isset($parsedJson['raw_text'])) {
-                        $parsedJson['raw_text'] = '';
-                    }
-                    
-                    return $parsedJson;
-                }
-                
-                Log::warning("Anthropic did not return a valid JSON: " . $resultText);
-            } else {
-                Log::error("Anthropic API call failed with status " . $response->status() . ": " . $response->body());
-            }
-        } catch (\Exception $e) {
-            Log::error("Exception in Anthropic processing: " . $e->getMessage());
         }
 
-        // Fallback to OpenAI if Anthropic fails
-        Log::warning("Anthropic API failed, trying OpenAI as fallback");
-        
-        $openaiKey = env('OPENAI_API_KEY');
-        if (!empty($openaiKey) && $openaiKey !== 'YOUR_OPENAI_KEY_HERE') {
-            return $this->processWithOpenAI($imagePath, $openaiKey);
-        }
-        
-        $geminiKey = env('GEMINI_API_KEY');
-        if (!empty($geminiKey) && $geminiKey !== 'YOUR_GEMINI_KEY_HERE') {
-            return $this->processWithGemini($imagePath, $geminiKey);
-        }
-        
-        return $this->processWithTesseract($imagePath);
-    }
-
-    /**
-     * Process image via OpenAI API.
-     */
-    private function processWithOpenAI(string $imagePath, string $apiKey): array
-    {
-        Log::info("Processing receipt with OpenAI API: {$imagePath}");
-        
-        try {
-            $imageData = base64_encode(file_get_contents($imagePath));
-            
-            // Get mime type of the image
-            $mimeType = 'image/jpeg';
-            if (function_exists('mime_content_type')) {
-                $mimeType = @mime_content_type($imagePath) ?: 'image/jpeg';
-            } else {
-                $pathInfo = pathinfo($imagePath);
-                $ext = strtolower($pathInfo['extension'] ?? '');
-                if ($ext === 'png') {
-                    $mimeType = 'image/png';
-                } elseif ($ext === 'webp') {
-                    $mimeType = 'image/webp';
-                }
-            }
-            
-            $prompt = "Identify the receipt/struk belanja details and return a clean JSON object.
-Ensure the output matches this exact JSON structure:
-{
-  \"store_name\": \"Name of the store/merchant (e.g. ALFAMART, INDOMARET, etc. in uppercase)\",
-  \"receipt_date\": \"Date on the receipt in YYYY-MM-DD format (if not found, use today's date)\",
-  \"total_price\": numeric_total_price (e.g. 45000),
-  \"items\": [
-    {
-      \"item_name\": \"Item description\",
-      \"price\": numeric_unit_price,
-      \"qty\": numeric_quantity,
-      \"subtotal\": numeric_subtotal
-    }
-  ],
-  \"raw_text\": \"All readable text on the receipt\"
-}
-
-Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string matching the schema.";
-
-            $model = env('OPENAI_MODEL', 'gpt-4o-mini');
-
-            $response = Http::timeout(30)
-                ->withHeaders([
-                    'Authorization' => "Bearer {$apiKey}",
-                    'Content-Type' => 'application/json'
-                ])
-                ->post("https://api.openai.com/v1/chat/completions", [
-                    'model' => $model,
-                    'response_format' => ['type' => 'json_object'],
-                    'messages' => [
-                        [
-                            'role' => 'user',
-                            'content' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => $prompt
-                                ],
-                                [
-                                    'type' => 'image_url',
-                                    'image_url' => [
-                                        'url' => "data:{$mimeType};base64,{$imageData}"
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]);
-
-            if ($response->successful()) {
-                $resultText = $response->json('choices.0.message.content');
-                Log::info("OpenAI Raw Response: " . $resultText);
-                
-                $parsedJson = json_decode(trim($resultText), true);
-                
-                if (json_last_error() === JSON_ERROR_NONE && isset($parsedJson['store_name'])) {
-                    $parsedJson['success'] = true;
-                    $parsedJson['message'] = 'Receipt successfully parsed via OpenAI API';
-                    
-                    // Guarantee fields exist
-                    if (!isset($parsedJson['total_price'])) {
-                        $parsedJson['total_price'] = 0;
-                    }
-                    if (!isset($parsedJson['receipt_date'])) {
-                        $parsedJson['receipt_date'] = Carbon::today()->toDateString();
-                    }
-                    if (!isset($parsedJson['items'])) {
-                        $parsedJson['items'] = [];
-                    }
-                    if (!isset($parsedJson['raw_text'])) {
-                        $parsedJson['raw_text'] = '';
-                    }
-                    
-                    return $parsedJson;
-                }
-                
-                Log::warning("OpenAI did not return a valid JSON: " . $resultText);
-            } else {
-                Log::error("OpenAI API call failed with status " . $response->status() . ": " . $response->body());
-            }
-        } catch (\Exception $e) {
-            Log::error("Exception in OpenAI processing: " . $e->getMessage());
-        }
-
-        // Fallback to Gemini if OpenAI fails
-        Log::warning("OpenAI API failed, trying Gemini as fallback");
-        
-        $geminiKey = env('GEMINI_API_KEY');
-        if (!empty($geminiKey) && $geminiKey !== 'YOUR_GEMINI_KEY_HERE') {
-            return $this->processWithGemini($imagePath, $geminiKey);
-        }
-        
         return $this->processWithTesseract($imagePath);
     }
 
@@ -291,10 +42,10 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     private function processWithGemini(string $imagePath, string $apiKey): array
     {
         Log::info("Processing receipt with Gemini AI: {$imagePath}");
-        
+
         try {
             $imageData = base64_encode(file_get_contents($imagePath));
-            
+
             // Get mime type of the image
             $mimeType = 'image/jpeg';
             if (function_exists('mime_content_type')) {
@@ -310,19 +61,24 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
                     $mimeType = 'image/gif';
                 }
             }
-            
+
             $prompt = "Identify the receipt/struk belanja details and return a clean JSON object.
 Ensure the output matches this exact JSON structure:
 {
   \"store_name\": \"Name of the store/merchant (e.g. ALFAMART, INDOMARET, etc. in uppercase)\",
   \"receipt_date\": \"Date on the receipt in YYYY-MM-DD format (if not found, use today's date)\",
   \"total_price\": numeric_total_price (e.g. 45000),
+  \"tax\": numeric_tax_price_or_vat (if not found, return 0),
+  \"discount\": numeric_discount_price (if not found, return 0),
+  \"category\": \"Main overall category of the receipt. Choose one of: Food & Beverage, Groceries, Electronics, Utilities, Fashion, Medical, Others\",
+  \"confidence_score\": numeric_confidence_score_from_0_to_100_based_on_text_legibility,
   \"items\": [
     {
       \"item_name\": \"Item description\",
       \"price\": numeric_unit_price,
       \"qty\": numeric_quantity,
-      \"subtotal\": numeric_subtotal
+      \"subtotal\": numeric_subtotal,
+      \"category\": \"Item category (e.g. Food, Beverage, Snack, Household, Personal Care, Electronics, Clothing, Medicine, Others)\"
     }
   ],
   \"raw_text\": \"All readable text on the receipt\"
@@ -353,33 +109,56 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
             if ($response->successful()) {
                 $resultText = $response->json('candidates.0.content.parts.0.text');
                 Log::info("Gemini Raw Response: " . $resultText);
-                
+
                 $parsedJson = json_decode(trim($resultText), true);
-                
+
                 if (json_last_error() === JSON_ERROR_NONE && isset($parsedJson['store_name'])) {
                     $parsedJson['success'] = true;
                     $parsedJson['message'] = 'Receipt successfully parsed via Gemini AI';
-                    
+
                     // Guarantee fields exist
                     if (!isset($parsedJson['total_price'])) {
                         $parsedJson['total_price'] = 0;
+                    }
+                    if (!isset($parsedJson['tax'])) {
+                        $parsedJson['tax'] = 0;
+                    }
+                    if (!isset($parsedJson['discount'])) {
+                        $parsedJson['discount'] = 0;
+                    }
+                    if (!isset($parsedJson['category'])) {
+                        $parsedJson['category'] = 'Others';
+                    }
+                    if (!isset($parsedJson['confidence_score'])) {
+                        $parsedJson['confidence_score'] = 90;
                     }
                     if (!isset($parsedJson['receipt_date'])) {
                         $parsedJson['receipt_date'] = Carbon::today()->toDateString();
                     }
                     if (!isset($parsedJson['items'])) {
                         $parsedJson['items'] = [];
+                    } else {
+                        foreach ($parsedJson['items'] as &$item) {
+                            if (!isset($item['category'])) {
+                                $item['category'] = 'Others';
+                            }
+                        }
                     }
                     if (!isset($parsedJson['raw_text'])) {
                         $parsedJson['raw_text'] = '';
                     }
-                    
+
                     return $parsedJson;
                 }
-                
+
                 Log::warning("Gemini did not return a valid JSON matching the format: " . $resultText);
             } else {
-                Log::error("Gemini API call failed with status " . $response->status() . ": " . $response->body());
+                $status = $response->status();
+                Log::error("Gemini API call failed with status " . $status . ": " . $response->body());
+                if ($status == 429 || $status == 400 || $status == 403) {
+                    \Illuminate\Support\Facades\Cache::put('gemini_quota_exhausted', true, now()->addHours(24));
+                    app(\App\Telegram\TelegramService::class)->notifyAdmins("⚠️ <b>Kunci API Gemini Bermasalah!</b>\nSistem gagal memproses struk menggunakan AI (Error {$status}).\n\nKuota API Key Google Gemini Anda habis atau kunci tidak valid. Sistem otomatis beralih ke Fallback Offline (Tesseract) hingga Anda memperbarui API Key di Pengaturan Dashboard.");
+                }
             }
         } catch (\Exception $e) {
             Log::error("Exception in Gemini processing: " . $e->getMessage());
@@ -393,6 +172,85 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     /**
      * Process image via local Tesseract OCR (Fallback).
      */
+
+    /**
+     * Resizes an image to a maximum dimension to save Gemini API tokens.
+     */
+    private function resizeImageForGemini(string $imagePath): ?string
+    {
+        try {
+            $info = getimagesize($imagePath);
+            if (!$info)
+                return null;
+
+            $width = $info[0];
+            $height = $info[1];
+            $mime = $info['mime'];
+
+            // Max dimensions (width or height)
+            $maxDimension = 1000;
+
+            if ($width <= $maxDimension && $height <= $maxDimension) {
+                return null; // No resizing needed
+            }
+
+            $ratio = $width / $height;
+            if ($ratio > 1) {
+                $newWidth = $maxDimension;
+                $newHeight = $maxDimension / $ratio;
+            } else {
+                $newHeight = $maxDimension;
+                $newWidth = $maxDimension * $ratio;
+            }
+
+            $newImage = imagecreatetruecolor((int) $newWidth, (int) $newHeight);
+
+            switch ($mime) {
+                case 'image/jpeg':
+                case 'image/jpg':
+                    $source = imagecreatefromjpeg($imagePath);
+                    break;
+                case 'image/png':
+                    // Maintain transparency for PNG
+                    imagealphablending($newImage, false);
+                    imagesavealpha($newImage, true);
+                    $transparent = imagecolorallocatealpha($newImage, 255, 255, 255, 127);
+                    imagefilledrectangle($newImage, 0, 0, (int) $newWidth, (int) $newHeight, $transparent);
+                    $source = imagecreatefrompng($imagePath);
+                    break;
+                case 'image/webp':
+                    $source = imagecreatefromwebp($imagePath);
+                    break;
+                default:
+                    return null;
+            }
+
+            if (!$source) {
+                imagedestroy($newImage);
+                return null;
+            }
+
+            imagecopyresampled($newImage, $source, 0, 0, 0, 0, (int) $newWidth, (int) $newHeight, $width, $height);
+
+            $tempDir = storage_path('app/temp');
+            if (!file_exists($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $tempPath = $tempDir . '/gemini_opt_' . time() . '_' . uniqid() . '.jpg';
+            imagejpeg($newImage, $tempPath, 85); // 85% quality to further save size
+
+            imagedestroy($newImage);
+            imagedestroy($source);
+
+            Log::info("Image resized for Gemini: {$width}x{$height} -> " . (int) $newWidth . "x" . (int) $newHeight);
+
+            return $tempPath;
+        } catch (\Exception $e) {
+            Log::error("Failed to resize image for Gemini: " . $e->getMessage());
+            return null;
+        }
+    }
     private function processWithTesseract(string $imagePath): array
     {
         // 1. Preprocess the image to optimize Tesseract reading
@@ -404,7 +262,7 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
 
         // 2. Run Tesseract OCR command
         $rawText = $this->runTesseract($preprocessedPath);
-        
+
         // Clean up preprocessed temp file if it was created
         if ($preprocessedPath !== $imagePath && file_exists($preprocessedPath)) {
             @unlink($preprocessedPath);
@@ -426,7 +284,8 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     {
         try {
             $info = getimagesize($imagePath);
-            if (!$info) return null;
+            if (!$info)
+                return null;
 
             $mime = $info['mime'];
             switch ($mime) {
@@ -447,7 +306,8 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
                     return null;
             }
 
-            if (!$image) return null;
+            if (!$image)
+                return null;
 
             // A. Convert to Grayscale
             imagefilter($image, IMG_FILTER_GRAYSCALE);
@@ -469,7 +329,7 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
             if (!file_exists($tempDir)) {
                 mkdir($tempDir, 0755, true);
             }
-            
+
             $tempPath = $tempDir . '/preprocessed_' . time() . '_' . uniqid() . '.png';
             imagepng($image, $tempPath);
             imagedestroy($image);
@@ -487,21 +347,21 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     private function runTesseract(string $imagePath): string
     {
         $tesseractPath = env('TESSERACT_PATH', 'C:\Program Files\Tesseract-OCR\tesseract.exe');
-        
+
         // Escape paths for shell execution on Windows/Linux
         $escapedTesseract = escapeshellarg($tesseractPath);
         $escapedImage = escapeshellarg($imagePath);
-        
+
         // Command to print output to stdout
         $command = "{$escapedTesseract} {$escapedImage} stdout --psm 4";
-        
+
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
             // Under Windows shell, standard wrapper
             $command = "\"{$tesseractPath}\" \"{$imagePath}\" stdout --psm 4";
         }
 
         Log::info("Executing command: {$command}");
-        
+
         try {
             $output = shell_exec($command);
             return $output ? trim($output) : '';
@@ -518,7 +378,7 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     {
         $lines = explode("\n", $rawText);
         $cleanLines = [];
-        
+
         foreach ($lines as $line) {
             $line = trim($line);
             if (!empty($line)) {
@@ -545,14 +405,30 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
             }
         }
 
+        // 5. Parse Tax & Discount
+        $tax = $this->extractTax($cleanLines);
+        $discount = $this->extractDiscount($cleanLines);
+
+        // 6. Categorize Store
+        $category = $this->categorizeStore($storeName);
+
+        // 7. Categorize Items
+        foreach ($items as &$item) {
+            $item['category'] = $this->categorizeItem($item['item_name']);
+        }
+
         return [
             'store_name' => $storeName,
             'receipt_date' => $receiptDate,
             'total_price' => $totalPrice,
+            'tax' => $tax,
+            'discount' => $discount,
+            'category' => $category,
+            'confidence_score' => 65, // slightly better confidence for successfully using regex heuristics
             'items' => $items,
             'raw_text' => $rawText,
             'success' => true,
-            'message' => 'Receipt successfully parsed'
+            'message' => 'Receipt successfully parsed (Fallback OCR - Regex Heuristics)'
         ];
     }
 
@@ -562,9 +438,19 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     private function extractStoreName(array $lines): string
     {
         $commonStores = [
-            'INDOMARET', 'ALFAMART', 'SUPER INDO', 'ALFAMIDI', 
-            'GIANT', 'CARREFOUR', 'YOGYA', 'HYPERMART', 
-            'TRANS MART', 'LAWSON', 'CIRCLE K', 'HERO', 'MATAHARI'
+            'INDOMARET',
+            'ALFAMART',
+            'SUPER INDO',
+            'ALFAMIDI',
+            'GIANT',
+            'CARREFOUR',
+            'YOGYA',
+            'HYPERMART',
+            'TRANS MART',
+            'LAWSON',
+            'CIRCLE K',
+            'HERO',
+            'MATAHARI'
         ];
 
         // Search for known keywords in the first 8 lines
@@ -581,13 +467,28 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
         // Fallback: Use the first non-numeric, clean-looking line
         for ($i = 0; $i < $searchLimit; $i++) {
             $line = trim($lines[$i]);
+            $lowerLine = strtolower($line);
             // Avoid address lines, phone numbers, or code looking lines
-            if (strlen($line) > 3 
-                && !preg_match('/^[0-9\-\.\/\s\:]+$/', $line)
-                && !str_contains(strtolower($line), 'jl.')
-                && !str_contains(strtolower($line), 'jalan')
-                && !str_contains(strtolower($line), 'telp')
-                && !str_contains(strtolower($line), 'npwp')
+            // Also avoid lines containing totals, prices, or typical bill summaries
+            if (
+                strlen($line) > 3
+                && !preg_match('/^[0-9\-\.\/\s\:\,]+$/', $line)
+                && !str_contains($lowerLine, 'jl.')
+                && !str_contains($lowerLine, 'jalan')
+                && !str_contains($lowerLine, 'telp')
+                && !str_contains($lowerLine, 'npwp')
+                && !str_contains($lowerLine, 'jumlah')
+                && !str_contains($lowerLine, 'jumiah')
+                && !str_contains($lowerLine, 'jumah')
+                && !str_contains($lowerLine, 'total')
+                && !str_contains($lowerLine, 'bayar')
+                && !str_contains($lowerLine, 'rp')
+                && !str_contains($lowerLine, 'tunai')
+                && !str_contains($lowerLine, 'kembali')
+                && !str_contains($lowerLine, 'cash')
+                && !str_contains($lowerLine, 'debit')
+                && !str_contains($lowerLine, 'nota')
+                && !str_contains($lowerLine, 'faktur')
             ) {
                 return $line;
             }
@@ -622,7 +523,7 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
                         return Carbon::createFromDate($matches[1], $matches[2], $matches[3])->toDateString();
                     } elseif ($index === 2) {
                         // DD-MM-YY
-                        $year = (int)$matches[3] > 80 ? '19' . $matches[3] : '20' . $matches[3];
+                        $year = (int) $matches[3] > 80 ? '19' . $matches[3] : '20' . $matches[3];
                         return Carbon::createFromDate($year, $matches[2], $matches[1])->toDateString();
                     }
                 } catch (\Exception $e) {
@@ -640,9 +541,9 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
      */
     private function extractTotal(string $text, array $lines): float
     {
-        // Direct search for Total in text
-        $totalKeywords = 'TOTAL|GRAND\s+TOTAL|JUMLAH|NETTO|BAYAR|TAGIHAN|SUBTOTAL';
-        $pattern = '/(?:' . $totalKeywords . ')\s*[:=]?\s*(?:Rp\.?\s*)?(\d{1,3}(?:[\.,]\d{3})+|\d{3,9})/i';
+        // Direct search for Total in text (including common OCR typos)
+        $totalKeywords = 'TOTAL|TOTA1|TOTA|GRAND\s+TOTAL|JUMLAH|JUML1H|JUMIAH|JUMAH|NETTO|BAYAR|BAVAR|TAGIHAN|SUBTOTAL';
+        $pattern = '/(?:' . $totalKeywords . ')\s*[:=]?\s*(?:Rp\.?|Fp\.?|Kp\.?\s*)?(\d{1,3}(?:[\.,]\d{3})+|\d{3,9})/i';
 
         if (preg_match_all($pattern, $text, $matches)) {
             // Return the last match (often grand total is at the bottom)
@@ -654,7 +555,7 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
         // Search lines in reverse (often at the bottom of the receipt)
         for ($i = count($lines) - 1; $i >= 0; $i--) {
             $line = $lines[$i];
-            if (preg_match('/(?:TOTAL|GRAND|JUMLAH|BAYAR)/i', $line)) {
+            if (preg_match('/(?:TOTAL|TOTA1|TOTA|GRAND|JUMLAH|JUML1H|JUMIAH|JUMAH|BAYAR|BAVAR)/i', $line)) {
                 if (preg_match('/(\d{1,3}(?:[\.,]\d{3})+|\d{3,9})/', $line, $numMatch)) {
                     return $this->cleanPrice($numMatch[1]);
                 }
@@ -670,11 +571,11 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     private function extractItems(array $lines): array
     {
         $items = [];
-        
+
         // Loop through lines, ignoring known store headers, payments, addresses
         foreach ($lines as $line) {
             $upperLine = strtoupper($line);
-            
+
             // Skip lines that represent totals, card details, VAT, taxes or address details
             if (preg_match('/(?:TOTAL|GRAND|JUMLAH|BAYAR|CASH|KEMBALI|DEBIT|EDC|KARTU|CHANGE|TUNAI|NPWP|JL\.|JALAN|TELP|PPN|TAX|DISKON|DISCOUNT|PROMO|MEMBER)/i', $upperLine)) {
                 continue;
@@ -684,11 +585,11 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
             // e.g. "AQUA 600ML 5.000"
             // or "INDOMIE AYAM BAWANG 3,500"
             // or "SHAMPOO 2 x 18000 36000"
-            
+
             // 1. Check for item lines with qty multiplier: e.g. "2 x 15.000" or "2x15000" or "3 * 4000"
             if (preg_match('/(.+?)\s+(\d+)\s*[x\*]\s*(\d{1,3}(?:[\.,]\d{3})+|\d{3,9})\s*(\d{1,3}(?:[\.,]\d{3})+|\d{3,9})?/i', $line, $matches)) {
                 $itemName = trim($matches[1]);
-                $qty = (int)$matches[2];
+                $qty = (int) $matches[2];
                 $price = $this->cleanPrice($matches[3]);
                 $subtotal = isset($matches[4]) ? $this->cleanPrice($matches[4]) : ($price * $qty);
 
@@ -731,11 +632,11 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
     {
         // Strip out currency signs and letters, leave numbers, commas, and dots
         $clean = preg_replace('/[^0-9\.,]/', '', $rawPrice);
-        
+
         // Handle common thousand/decimal separators in Indonesia
         // If there's a dot followed by 3 digits at the end (e.g. 5.000), it's a thousand separator.
         // We remove dots if they are thousand separators.
-        
+
         // A common way: count the number of dots and commas
         // If it's like 5,000 or 5.000 -> typically 5000 in IDR.
         // If there is only one separator, and it is followed by exactly 3 digits, we remove it.
@@ -758,10 +659,105 @@ Do not wrap the JSON in markdown code blocks. Return ONLY the raw JSON string ma
             'store_name' => 'Unknown Store',
             'receipt_date' => Carbon::today()->toDateString(),
             'total_price' => 0,
+            'tax' => 0,
+            'discount' => 0,
+            'category' => 'Others',
+            'confidence_score' => 0,
             'items' => [],
             'raw_text' => '',
             'success' => false,
             'message' => $message
         ];
+    }
+
+    /**
+     * Extracts tax/VAT from lines using Regex.
+     */
+    private function extractTax(array $lines): float
+    {
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            $line = $lines[$i];
+            if (preg_match('/(?:PPN|TAX|PAJAK|VAT)\s*(?:10%|11%|12%)?\s*[:=]?\s*(?:Rp\.?)?\s*(\d{1,3}(?:[\.,]\d{3})+|\d{1,9})/i', $line, $match)) {
+                return $this->cleanPrice($match[1]);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Extracts discount from lines using Regex.
+     */
+    private function extractDiscount(array $lines): float
+    {
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            $line = $lines[$i];
+            if (preg_match('/(?:DISKON|DISCOUNT|POTONGAN|PROMO)\s*[:=]?\s*(?:Rp\.?|-)?\s*(\d{1,3}(?:[\.,]\d{3})+|\d{1,9})/i', $line, $match)) {
+                return $this->cleanPrice($match[1]);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Heuristics to categorize store based on name.
+     */
+    private function categorizeStore(string $storeName): string
+    {
+        $storeName = strtolower($storeName);
+        if (str_contains($storeName, 'indomaret') || str_contains($storeName, 'alfamart') || str_contains($storeName, 'super indo') || str_contains($storeName, 'hypermart') || str_contains($storeName, 'alfamidi') || str_contains($storeName, 'trans mart') || str_contains($storeName, 'lotte')) {
+            return 'Groceries';
+        }
+        if (str_contains($storeName, 'kfc') || str_contains($storeName, 'mcdonald') || str_contains($storeName, 'starbucks') || str_contains($storeName, 'cafe') || str_contains($storeName, 'kopi') || str_contains($storeName, 'resto') || str_contains($storeName, 'warteg') || str_contains($storeName, 'soto')) {
+            return 'Food & Beverage';
+        }
+        if (str_contains($storeName, 'apotek') || str_contains($storeName, 'k24') || str_contains($storeName, 'kimia farma') || str_contains($storeName, 'guardian') || str_contains($storeName, 'watsons')) {
+            return 'Medical';
+        }
+        if (str_contains($storeName, 'pln') || str_contains($storeName, 'pdam') || str_contains($storeName, 'telkom') || str_contains($storeName, 'bpjs')) {
+            return 'Utilities';
+        }
+        if (str_contains($storeName, 'matahari') || str_contains($storeName, 'zara') || str_contains($storeName, 'uniqlo') || str_contains($storeName, 'hnm')) {
+            return 'Fashion';
+        }
+        if (str_contains($storeName, 'erafone') || str_contains($storeName, 'ibox')) {
+            return 'Electronics';
+        }
+        return 'Others';
+    }
+
+    /**
+     * Heuristics to categorize an item based on keywords.
+     */
+    private function categorizeItem(string $itemName): string
+    {
+        $itemName = strtolower($itemName);
+        $foodKeywords = ['roti', 'nasi', 'mie', 'indomie', 'sari roti', 'ayam', 'telur', 'biskuit', 'chitato', 'silverqueen', 'kacang', 'snack', 'taro', 'lays', 'oreo'];
+        $bevKeywords = ['kopi', 'susu', 'teh', 'aqua', 'le minerale', 'coca cola', 'sprite', 'fanta', 'jus', 'milo', 'yakult', 'bear brand', 'nescafe', 'pucuk'];
+        $careKeywords = ['shampoo', 'sabun', 'pasta gigi', 'odol', 'sunscreen', 'wardah', 'pepsodent', 'pantene', 'lifebuoy', 'clear', 'garnier', 'parfum', 'deodorant'];
+        $houseKeywords = ['rinso', 'soklin', 'baygon', 'hit', 'sunlight', 'tisu', 'tissue', 'kapas', 'detergen', 'molto', 'royale', 'pewangi', 'kamper'];
+        $medKeywords = ['panadol', 'paramex', 'bodrex', 'tolak angin', 'promag', 'vitamin', 'betadine', 'minyak kayu putih', 'salonpas', 'hansaplast'];
+
+        foreach ($bevKeywords as $kw) {
+            if (str_contains($itemName, $kw))
+                return 'Beverage';
+        }
+        foreach ($foodKeywords as $kw) {
+            if (str_contains($itemName, $kw))
+                return 'Snack';
+        } // defaults general food to Snack/Food
+        foreach ($careKeywords as $kw) {
+            if (str_contains($itemName, $kw))
+                return 'Personal Care';
+        }
+        foreach ($houseKeywords as $kw) {
+            if (str_contains($itemName, $kw))
+                return 'Household';
+        }
+        foreach ($medKeywords as $kw) {
+            if (str_contains($itemName, $kw))
+                return 'Medicine';
+        }
+
+        return 'Others';
     }
 }

@@ -45,7 +45,12 @@
                 </svg>
             </div>
             <div>
-                <h1 class="text-sm font-extrabold text-white tracking-tight">Koreksi Struk</h1>
+                <div class="flex items-center gap-1.5">
+                    <h1 class="text-sm font-extrabold text-white tracking-tight">Koreksi Struk</h1>
+                    @if(isset($receipt->confidence_score))
+                        <span class="text-[8px] font-bold px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">🧠 AI: {{ $receipt->confidence_score }}%</span>
+                    @endif
+                </div>
                 <p class="text-[10px] text-slate-400">Kode: <span class="font-mono">{{ $receipt->receipt_code }}</span></p>
             </div>
         </div>
@@ -104,6 +109,31 @@
                     <input type="date" name="receipt_date" x-model="receiptDate" required 
                            class="w-full px-3.5 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
                 </div>
+                <div class="grid grid-cols-3 gap-2 pt-2">
+                    <div>
+                        <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kategori</label>
+                        <select name="category" x-model="category"
+                                class="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
+                            <option value="Food & Beverage">🍴 F&B</option>
+                            <option value="Groceries">🛒 Groceries</option>
+                            <option value="Electronics">🔌 Electr.</option>
+                            <option value="Utilities">💡 Utils</option>
+                            <option value="Fashion">👕 Fashion</option>
+                            <option value="Medical">💊 Medical</option>
+                            <option value="Others">📦 Others</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pajak (Rp)</label>
+                        <input type="number" name="tax" x-model.number="tax"
+                               class="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Diskon (Rp)</label>
+                        <input type="number" name="discount" x-model.number="discount"
+                               class="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
+                    </div>
+                </div>
             </div>
 
             <!-- Items List -->
@@ -129,18 +159,34 @@
                             <input type="text" :name="`items[${index}][item_name]`" x-model="item.item_name" required placeholder="Nama Barang" 
                                    class="w-full px-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
                             
-                            <div class="grid grid-cols-2 gap-2">
+                            <div class="grid grid-cols-3 gap-2">
+                                <!-- Item Category -->
+                                <div>
+                                    <label class="block text-[9px] text-slate-500 font-bold mb-0.5">Kategori</label>
+                                    <select :name="`items[${index}][category]`" x-model="item.category"
+                                            class="w-full px-1.5 py-1.5 text-[10px] rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
+                                        <option value="Food">🍔 Food</option>
+                                        <option value="Beverage">🥤 Bev</option>
+                                        <option value="Snack">🍿 Snack</option>
+                                        <option value="Household">🧹 House</option>
+                                        <option value="Personal Care">🧴 Care</option>
+                                        <option value="Electronics">🔌 Elect</option>
+                                        <option value="Clothing">👕 Cloth</option>
+                                        <option value="Medicine">💊 Med</option>
+                                        <option value="Others">📦 Other</option>
+                                    </select>
+                                </div>
                                 <!-- Qty -->
                                 <div>
-                                    <label class="block text-[9px] text-slate-500 font-bold mb-0.5">Jumlah (Qty)</label>
+                                    <label class="block text-[9px] text-slate-500 font-bold mb-0.5">Jumlah</label>
                                     <input type="number" :name="`items[${index}][qty]`" x-model.number="item.qty" required min="1" 
                                            class="w-full px-2 py-1.5 text-xs text-center rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
                                 </div>
                                 <!-- Price -->
                                 <div>
-                                    <label class="block text-[9px] text-slate-500 font-bold mb-0.5">Harga Satuan (Rp)</label>
+                                    <label class="block text-[9px] text-slate-500 font-bold mb-0.5">Harga</label>
                                     <input type="number" :name="`items[${index}][price]`" x-model.number="item.price" required 
-                                           class="w-full px-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
+                                           class="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-blue-500 focus:outline-none transition">
                                 </div>
                             </div>
                         </div>
@@ -195,11 +241,16 @@
                 storeName: @json($receipt->store_name),
                 receiptDate: @json($receipt->receipt_date),
                 totalPrice: @json((float)$receipt->total_price),
+                tax: @json((float)($receipt->tax ?? 0)),
+                discount: @json((float)($receipt->discount ?? 0)),
+                category: @json($receipt->category ?? 'Others'),
+                confidenceScore: @json($receipt->confidence_score !== null ? (int)$receipt->confidence_score : null),
                 zoomScale: 1,
                 items: @json(
                     $receipt->items->map(function($item) {
                         return [
                             'item_name' => $item->item_name,
+                            'category' => $item->category ?? 'Others',
                             'price' => (float)$item->price,
                             'qty' => (int)$item->qty
                         ];
@@ -209,6 +260,7 @@
                 addItem() {
                     this.items.push({
                         item_name: '',
+                        category: 'Others',
                         price: 0,
                         qty: 1
                     });

@@ -91,6 +91,10 @@ class ProcessReceiptOCRJob implements ShouldQueue
             'receipt_code' => $code,
             'store_name' => $parsedData['store_name'],
             'total_price' => $parsedData['total_price'],
+            'tax' => $parsedData['tax'] ?? 0,
+            'discount' => $parsedData['discount'] ?? 0,
+            'category' => $parsedData['category'] ?? 'Others',
+            'confidence_score' => $parsedData['confidence_score'] ?? 90,
             'receipt_image' => $relativeStoragePath,
             'receipt_date' => $date,
             'raw_text' => $parsedData['raw_text'],
@@ -102,6 +106,7 @@ class ProcessReceiptOCRJob implements ShouldQueue
         foreach ($parsedData['items'] as $item) {
             $items[] = [
                 'item_name' => $item['item_name'],
+                'category' => $item['category'] ?? 'Others',
                 'price' => $item['price'],
                 'qty' => $item['qty'],
                 'subtotal' => $item['subtotal']

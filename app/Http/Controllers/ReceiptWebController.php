@@ -64,13 +64,13 @@ class ReceiptWebController extends Controller
     {
         $filters = $request->only(['search', 'store', 'start_date', 'end_date', 'sort_by', 'sort_order']);
         $receipts = $this->receiptRepository->getFiltered($filters, 9); // Paginate 9 per page
-        
+
         $stores = $this->receiptRepository->getUniqueStores();
 
         $editReceipt = null;
         if ($request->has('edit')) {
             try {
-                $editReceipt = $this->receiptRepository->find((int)$request->query('edit'))->load('items');
+                $editReceipt = $this->receiptRepository->find((int) $request->query('edit'))->load('items');
             } catch (\Exception $e) {
                 // Ignore if not found
             }
@@ -88,8 +88,12 @@ class ReceiptWebController extends Controller
             'store_name' => 'required|string|max:255',
             'receipt_date' => 'required|date',
             'total_price' => 'required|numeric',
+            'category' => 'nullable|string|max:255',
+            'tax' => 'nullable|numeric',
+            'discount' => 'nullable|numeric',
             'items' => 'required|array',
             'items.*.item_name' => 'required|string|max:255',
+            'items.*.category' => 'nullable|string|max:255',
             'items.*.price' => 'required|numeric',
             'items.*.qty' => 'required|integer|min:1',
         ]);
@@ -97,12 +101,13 @@ class ReceiptWebController extends Controller
         try {
             $itemsData = [];
             $computedTotal = 0;
-            
+
             foreach ($request->items as $item) {
                 $subtotal = $item['price'] * $item['qty'];
                 $computedTotal += $subtotal;
                 $itemsData[] = [
                     'item_name' => $item['item_name'],
+                    'category' => $item['category'] ?? 'Others',
                     'price' => $item['price'],
                     'qty' => $item['qty'],
                     'subtotal' => $subtotal
@@ -116,9 +121,12 @@ class ReceiptWebController extends Controller
                 'store_name' => $request->input('store_name'),
                 'receipt_date' => $request->input('receipt_date'),
                 'total_price' => $totalPrice,
+                'category' => $request->input('category') ?: 'Others',
+                'tax' => $request->input('tax') ?: 0,
+                'discount' => $request->input('discount') ?: 0,
             ];
 
-            $this->receiptRepository->update((int)$id, $data, $itemsData);
+            $this->receiptRepository->update((int) $id, $data, $itemsData);
 
             // Rebuild analytics cache
             $this->analyticsService->getDashboardStats();
@@ -143,15 +151,15 @@ class ReceiptWebController extends Controller
     public function deleteReceipt($id)
     {
         try {
-            $receipt = $this->receiptRepository->find((int)$id);
-            
+            $receipt = $this->receiptRepository->find((int) $id);
+
             // Delete image file from local storage
             if ($receipt->receipt_image) {
                 Storage::disk('public')->delete($receipt->receipt_image);
             }
 
             $code = $receipt->receipt_code;
-            $this->receiptRepository->delete((int)$id);
+            $this->receiptRepository->delete((int) $id);
 
             // Rebuild analytics cache
             $this->analyticsService->getDashboardStats();
@@ -179,7 +187,7 @@ class ReceiptWebController extends Controller
         $receipts = $this->receiptRepository->getFiltered($filters, 1000)->items(); // Get items from paginator limit 1000
 
         $csv = $this->exportService->exportToCsv($receipts);
-        
+
         $filename = 'Receipts_Export_' . Carbon::now()->format('Ymd_His') . '.csv';
 
         return response($csv, 200, [
@@ -197,7 +205,7 @@ class ReceiptWebController extends Controller
         $receipts = $this->receiptRepository->getFiltered($filters, 1000)->items();
 
         $excelHtml = $this->exportService->exportToExcel($receipts);
-        
+
         $filename = 'Receipts_Export_' . Carbon::now()->format('Ymd_His') . '.xls';
 
         return response($excelHtml, 200, [
@@ -223,23 +231,42 @@ class ReceiptWebController extends Controller
         $request->validate([
             'telegram_chat_id' => 'nullable|string|max:100',
             'tesseract_path' => 'nullable|string|max:500',
-            'telegram_bot_token' => 'nullable|string|max:200'
+            'telegram_bot_token' => 'nullable|string|max:200',
+            'gemini_api_key' => 'nullable|string|max:200',
+
         ]);
 
         $user = Auth::user();
-        
+
         // Save Telegram Chat ID to Current User
         if ($request->has('telegram_chat_id')) {
             $user->telegram_chat_id = $request->input('telegram_chat_id');
             $user->save();
         }
 
+        $envUpdates = [];
+
+        // Settings for external tools
+        if ($request->has('tesseract_path'))
+            $envUpdates['TESSERACT_PATH'] = $request->input('tesseract_path') ?? 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe';
+        if ($request->has('telegram_bot_token'))
+            $envUpdates['TELEGRAM_BOT_TOKEN'] = $request->input('telegram_bot_token') ?? 'YOUR_BOT_TOKEN_HERE';
+
+        // Settings for AI API Keys
+        $apiKeysUpdated = false;
+        if ($request->has('gemini_api_key')) {
+            $envUpdates['GEMINI_API_KEY'] = $request->input('gemini_api_key') ?? 'YOUR_GEMINI_KEY_HERE';
+            \Illuminate\Support\Facades\Cache::forget('gemini_quota_exhausted');
+            $apiKeysUpdated = true;
+        }
+
         // Save environmental variables
-        if ($request->has('tesseract_path') || $request->has('telegram_bot_token')) {
-            $this->updateEnvironmentFile([
-                'TESSERACT_PATH' => $request->input('tesseract_path') ?? 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe',
-                'TELEGRAM_BOT_TOKEN' => $request->input('telegram_bot_token') ?? 'YOUR_BOT_TOKEN_HERE'
-            ]);
+        if (!empty($envUpdates)) {
+            $this->updateEnvironmentFile($envUpdates);
+        }
+
+        if ($apiKeysUpdated) {
+            app(\App\Telegram\TelegramService::class)->notifyAdmins("✅ <b>API Key AI Diperbarui!</b>\nKonfigurasi API Key untuk AI (Gemini) baru saja disimpan di Dashboard.\n\nSistem Quota Limit telah di-reset, AI kembali berjalan sebagai prioritas utama (Priority 1) untuk ekstraksi struk!");
         }
 
         // Log activity
@@ -253,12 +280,95 @@ class ReceiptWebController extends Controller
     }
 
     /**
+     * Handle web receipt upload.
+     */
+    public function upload(Request $request, \App\OCR\OCRService $ocrService, \App\Services\AnalyticsService $analyticsService)
+    {
+        $request->validate([
+            'receipt_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        try {
+            $file = $request->file('receipt_image');
+            $filename = 'RCP_' . time() . '_' . \Illuminate\Support\Str::random(8) . '.' . $file->getClientOriginalExtension();
+            $relativeStoragePath = 'receipts/' . $filename;
+
+            // Simpan gambar secara lokal di disk public (storage/app/public)
+            $path = $file->storeAs('receipts', $filename, 'public');
+            $absolutePath = storage_path('app/public/' . $path);
+
+            // Proses OCR
+            $parsedData = $ocrService->process($absolutePath);
+
+            if (!$parsedData['success']) {
+                // Hapus file jika gagal OCR
+                if (file_exists($absolutePath)) {
+                    @unlink($absolutePath);
+                }
+                return redirect()->back()->with('error', 'Gagal memproses struk. AI gagal membaca data dari gambar Anda. Silakan coba gambar yang lebih terang.');
+            }
+
+            // Simpan ke DB
+            try {
+                $date = \Carbon\Carbon::parse($parsedData['receipt_date'])->toDateString();
+            } catch (\Exception $e) {
+                $date = \Carbon\Carbon::today()->toDateString();
+            }
+
+            $code = 'RCP-' . \Carbon\Carbon::today()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(4));
+
+            $receiptData = [
+                'receipt_code' => $code,
+                'store_name' => $parsedData['store_name'],
+                'total_price' => $parsedData['total_price'],
+                'tax' => $parsedData['tax'] ?? 0,
+                'discount' => $parsedData['discount'] ?? 0,
+                'category' => $parsedData['category'] ?? 'Others',
+                'confidence_score' => $parsedData['confidence_score'] ?? 90,
+                'receipt_image' => $relativeStoragePath,
+                'receipt_date' => $date,
+                'raw_text' => $parsedData['raw_text'],
+                'created_by' => auth()->id()
+            ];
+
+            $items = [];
+            foreach ($parsedData['items'] as $item) {
+                $items[] = [
+                    'item_name' => $item['item_name'],
+                    'category' => $item['category'] ?? 'Others',
+                    'price' => $item['price'],
+                    'qty' => $item['qty'],
+                    'subtotal' => $item['subtotal']
+                ];
+            }
+
+            $receipt = $this->receiptRepository->create($receiptData, $items);
+
+            // Log activity
+            \App\Models\ActivityLog::create([
+                'user_id' => auth()->id(),
+                'activity' => 'Unggah Struk via Website',
+                'description' => "Struk {$code} dari " . $parsedData['store_name'] . " dengan total Rp " . number_format($parsedData['total_price'], 0, ',', '.') . " diunggah via Website dan diproses OCR."
+            ]);
+
+            // Clear cache
+            $analyticsService->getDashboardStats();
+
+            return redirect()->route('receipts.index')->with('success', 'Struk berhasil diunggah dan diproses oleh AI OCR!');
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to process web receipt upload: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat memproses gambar.');
+        }
+    }
+
+    /**
      * Register app webhook with Telegram Bot API automatically based on APP_URL!
      */
     public function setTelegramWebhook()
     {
         $botToken = env('TELEGRAM_BOT_TOKEN');
-        
+
         if (empty($botToken) || $botToken === 'YOUR_BOT_TOKEN_HERE') {
             return redirect()->back()->with('error', 'Gagal: Telegram Bot Token belum dikonfigurasi di file .env!');
         }
@@ -274,7 +384,7 @@ class ReceiptWebController extends Controller
 
         try {
             $response = Http::get($apiUrl);
-            
+
             if ($response->successful() && $response->json('ok') === true) {
                 // Log activity
                 ActivityLog::create([
@@ -304,7 +414,7 @@ class ReceiptWebController extends Controller
             foreach ($data as $key => $value) {
                 // Keep windows backslashes correctly escaped
                 $escapedValue = str_replace('\\', '\\\\', $value);
-                
+
                 // Regex to find and replace existing key, or append if not exists
                 if (preg_match("/^{$key}=.*/m", $content)) {
                     $replacement = "{$key}=\"{$escapedValue}\"";
@@ -326,8 +436,8 @@ class ReceiptWebController extends Controller
     public function telegramEdit($id, $hash)
     {
         try {
-            $receipt = $this->receiptRepository->find((int)$id)->load('items');
-            
+            $receipt = $this->receiptRepository->find((int) $id)->load('items');
+
             // Verify hash
             $expectedHash = hash_hmac('sha256', $receipt->id . $receipt->receipt_code, env('APP_KEY'));
             if (!hash_equals($expectedHash, $hash)) {
@@ -346,8 +456,8 @@ class ReceiptWebController extends Controller
     public function telegramUpdate(Request $request, $id, $hash)
     {
         try {
-            $receipt = $this->receiptRepository->find((int)$id);
-            
+            $receipt = $this->receiptRepository->find((int) $id);
+
             // Verify hash
             $expectedHash = hash_hmac('sha256', $receipt->id . $receipt->receipt_code, env('APP_KEY'));
             if (!hash_equals($expectedHash, $hash)) {
@@ -358,20 +468,25 @@ class ReceiptWebController extends Controller
                 'store_name' => 'required|string|max:255',
                 'receipt_date' => 'required|date',
                 'total_price' => 'required|numeric',
+                'category' => 'nullable|string|max:255',
+                'tax' => 'nullable|numeric',
+                'discount' => 'nullable|numeric',
                 'items' => 'required|array',
                 'items.*.item_name' => 'required|string|max:255',
+                'items.*.category' => 'nullable|string|max:255',
                 'items.*.price' => 'required|numeric',
                 'items.*.qty' => 'required|integer|min:1',
             ]);
 
             $itemsData = [];
             $computedTotal = 0;
-            
+
             foreach ($request->items as $item) {
                 $subtotal = $item['price'] * $item['qty'];
                 $computedTotal += $subtotal;
                 $itemsData[] = [
                     'item_name' => $item['item_name'],
+                    'category' => $item['category'] ?? 'Others',
                     'price' => $item['price'],
                     'qty' => $item['qty'],
                     'subtotal' => $subtotal
@@ -384,9 +499,12 @@ class ReceiptWebController extends Controller
                 'store_name' => $request->input('store_name'),
                 'receipt_date' => $request->input('receipt_date'),
                 'total_price' => $totalPrice,
+                'category' => $request->input('category') ?: 'Others',
+                'tax' => $request->input('tax') ?: 0,
+                'discount' => $request->input('discount') ?: 0,
             ];
 
-            $this->receiptRepository->update((int)$id, $data, $itemsData);
+            $this->receiptRepository->update((int) $id, $data, $itemsData);
 
             // Rebuild analytics cache
             $this->analyticsService->getDashboardStats();
@@ -402,5 +520,57 @@ class ReceiptWebController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to update receipt: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * API for Real-Time Dashboard updates via AJAX Polling.
+     */
+    public function apiDashboardStats()
+    {
+        $stats = $this->analyticsService->getDashboardStats();
+        $recentTransactions = $this->receiptRepository->getRecent(5);
+        $activityLogs = ActivityLog::with('user')->orderBy('created_at', 'desc')->limit(5)->get();
+
+        // ApexCharts compiled data
+        $spendingTrend = $this->analyticsService->getDailySpendingChartData(15);
+        $storeSpending = $this->analyticsService->getStoreSpendingChartData();
+        $topProducts = $this->analyticsService->getTopProductsChartData(5);
+
+        // Format dates and prepare custom HTML structures if needed to make the frontend replacement easy
+        $recentTransactionsData = $recentTransactions->map(function ($tx) {
+            return [
+                'id' => $tx->id,
+                'receipt_code' => $tx->receipt_code,
+                'store_name' => $tx->store_name,
+                'receipt_date' => \Carbon\Carbon::parse($tx->receipt_date)->translatedFormat('d M Y'),
+                'total_price' => number_format($tx->total_price, 0, ',', '.'),
+                'total_num' => $tx->total_price,
+                'receipt_image' => $tx->receipt_image ? asset('storage/' . $tx->receipt_image) : null,
+                'initial' => strtoupper(substr($tx->store_name ?? 'S', 0, 1))
+            ];
+        });
+
+        $activityLogsData = $activityLogs->map(function ($log) {
+            return [
+                'activity' => $log->activity,
+                'time' => $log->created_at->diffForHumans()
+            ];
+        });
+
+        $htmlStats = [
+            'today' => number_format($stats['today']['total'], 0, ',', '.'),
+            'week' => number_format($stats['week']['total'], 0, ',', '.'),
+            'month' => number_format($stats['month']['total'], 0, ',', '.'),
+            'year' => number_format($stats['year']['total'], 0, ',', '.')
+        ];
+
+        return response()->json([
+            'stats' => $htmlStats,
+            'recentTransactions' => $recentTransactionsData,
+            'activityLogs' => $activityLogsData,
+            'spendingTrend' => $spendingTrend,
+            'storeSpending' => $storeSpending,
+            'topProducts' => $topProducts
+        ]);
     }
 }

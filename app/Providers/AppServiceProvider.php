@@ -26,6 +26,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Force HTTPS URL scheme only when NOT accessing locally via localhost/127.0.0.1
+        if (str_starts_with(config('app.url'), 'https://')) {
+            $host = request()->getHost();
+            if (!in_array($host, ['127.0.0.1', 'localhost', '::1'])) {
+                \Illuminate\Support\Facades\URL::forceScheme('https');
+            }
+        }
     }
 }

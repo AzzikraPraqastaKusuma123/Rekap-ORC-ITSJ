@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 #[Fillable([
     'receipt_id',
     'item_name',
+    'category',
     'price',
     'qty',
     'subtotal'

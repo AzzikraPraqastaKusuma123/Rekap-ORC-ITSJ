@@ -12,7 +12,7 @@ $geminiKey = env('GEMINI_API_KEY');
 
 echo "Testing Gemini API Key: " . substr($geminiKey, 0, 12) . "...\n";
 try {
-    $model = 'gemini-1.5-flash';
+    $model = 'gemini-2.5-flash';
     $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$geminiKey}", [
         'contents' => [
             [
