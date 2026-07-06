@@ -10,6 +10,7 @@
     <title>{{ config('app.name', 'ReceiptOptima') }} — Pemindai Struk & Rekap Keuangan</title>
     <meta name="description"
         content="ReceiptOptima — Sistem pemindai struk belanja otomatis berbasis AI dan Telegram OCR untuk rekap keuangan instan.">
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
 
     <!-- Preconnect Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -63,6 +64,18 @@
         }
     </style>
 
+    <!-- ===== DYNAMIC ROLE ACCENT THEME ===== -->
+    <style>
+        :root {
+            --brand-primary:
+                {{ $roleTheme['brandPrimary'] }}
+            ;
+            --brand-primary-hover:
+                {{ $roleTheme['brandHover'] }}
+            ;
+        }
+    </style>
+
     <!-- Prevent FOUC (Flash of Unstyled Content) - Theme init -->
     <script>
         (function () {
@@ -81,10 +94,36 @@
 
 <body class="h-full antialiased overflow-x-hidden" x-data="{ 
         mobileSidebarOpen: false,
-        currentTheme: localStorage.getItem('theme') || 'dark'
-    }">
+        currentTheme: localStorage.getItem('theme') || 'dark',
+        isGlobalLoading: true
+    }" @@start-global-loading.window="isGlobalLoading = true" @@stop-global-loading.window="isGlobalLoading = false">
 
-    <!-- ===== MOBILE SIDEBAR OVERLAY (tap outside to close) ===== -->
+    <!-- ===== GLOBAL LOADING SCREEN ===== -->
+    <div x-show="isGlobalLoading" x-transition:leave="transition ease-in duration-300"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md">
+
+        <div class="relative flex items-center justify-center mb-6">
+            <!-- Pulsing outer ring -->
+            <div class="absolute inset-0 rounded-2xl {{ $roleTheme['svgBg'] }} animate-ping"></div>
+            <!-- Center Logo -->
+            <div
+                class="relative z-10 w-20 h-20 bg-white dark:bg-slate-800 rounded-2xl shadow-xl flex items-center justify-center border border-slate-200 dark:border-slate-700 animate-pulse">
+                <img src="{{ asset('logo.png') }}" class="w-12 h-12 object-contain" alt="Optima Logo">
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 {{ $roleTheme['bg'] }} rounded-full animate-bounce"></span>
+            <span class="w-2.5 h-2.5 {{ $roleTheme['bg'] }} rounded-full animate-bounce"
+                style="animation-delay: 0.15s;"></span>
+            <span class="w-2.5 h-2.5 {{ $roleTheme['bg'] }} rounded-full animate-bounce"
+                style="animation-delay: 0.3s;"></span>
+        </div>
+        <div class="mt-4 text-sm font-semibold text-slate-500 font-display animate-pulse tracking-widest uppercase">
+            Memuat Sistem...
+        </div>
+    </div>
     <div class="fixed inset-0 z-40 bg-slate-900/40 md:hidden" x-show="mobileSidebarOpen" x-cloak
         @click="mobileSidebarOpen = false" @touchstart="mobileSidebarOpen = false" x-transition.opacity.duration.200ms>
     </div>
@@ -98,14 +137,11 @@
 
         <!-- Brand -->
         <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800 shrink-0">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
-                <img src="{{ asset('logo.png') }}" alt="Logo ITSJ OCR" class="w-10 h-10 object-contain drop-shadow-md">
-                <div>
-                    <div class="text-base font-bold tracking-tight font-display text-slate-900 dark:text-white">
-                        Receipt<span class="text-blue-600">Optima</span>
-                    </div>
-                    <div class="text-[10px] font-bold tracking-widest uppercase text-slate-500">Pemindai Struk AI</div>
-                </div>
+            <a href="{{ route('dashboard') }}" class="flex items-center">
+                <img src="{{ asset('Logo app black.png') }}" alt="Logo ITSJ OCR"
+                    class="w-44 h-auto object-contain drop-shadow-sm dark:hidden">
+                <img src="{{ asset('Logo app.png') }}" alt="Logo ITSJ OCR Dark"
+                    class="w-44 h-auto object-contain drop-shadow-sm hidden dark:block">
             </a>
             <button type="button" @click="mobileSidebarOpen = false" @touchstart="mobileSidebarOpen = false"
                 class="icon-btn">
@@ -124,7 +160,7 @@
         <div class="mt-auto p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 shrink-0">
             <div class="flex items-center gap-3">
                 <div
-                    class="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold bg-blue-600 text-white shrink-0">
+                    class="w-10 h-10 flex items-center justify-center rounded-lg text-sm font-bold text-white shrink-0 shadow-md {{ $roleTheme['bg'] }} transition-transform hover:scale-105 duration-200">
                     {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
                 </div>
                 <div class="flex-1 min-w-0">
@@ -152,15 +188,12 @@
         <aside id="app-sidebar" class="hidden md:flex flex-col w-64 xl:w-72 shrink-0 sticky top-0 h-screen z-30">
 
             <!-- Brand Header -->
-            <div class="flex items-center gap-3 px-6 py-6 border-b border-slate-200 dark:border-slate-800 shrink-0">
-                <img src="{{ asset('logo.png') }}" alt="Logo ITSJ OCR" class="w-10 h-10 object-contain drop-shadow-md">
-                <div>
-                    <div class="text-base font-bold tracking-tight font-display text-slate-900 dark:text-white">
-                        Receipt<span class="text-blue-600">Optima</span>
-                    </div>
-                    <div class="text-[10px] font-bold tracking-widest uppercase text-slate-500 mt-0.5">Pemindai Struk AI
-                    </div>
-                </div>
+            <div class="flex items-center justify-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 w-full hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                onclick="window.location='{{ route('dashboard') }}'">
+                <img src="{{ asset('Logo app black.png') }}" alt="Logo ITSJ OCR Light"
+                    class="w-56 h-auto object-contain drop-shadow-sm dark:hidden">
+                <img src="{{ asset('Logo app.png') }}" alt="Logo ITSJ OCR Dark"
+                    class="w-56 h-auto object-contain drop-shadow-sm hidden dark:block">
             </div>
 
             <!-- Navigation Links -->
@@ -186,21 +219,41 @@
                                 d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
                     </span>
-                    <span class="font-display">Riwayat Struk</span>
+                    <span class="font-display">
+                        @if(auth()->user()->role === 'admin')
+                            Daftar Persetujuan
+                        @else
+                            Riwayat Struk
+                        @endif
+                    </span>
                 </a>
 
-                <!-- Settings -->
-                <a href="{{ route('settings') }}"
-                    class="nav-link flex items-center gap-3.5 px-4 py-3 text-sm font-semibold {{ request()->routeIs('settings') ? 'nav-link-active' : '' }}">
-                    <span class="w-6 h-6 flex items-center justify-center shrink-0">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                    </span>
-                    <span class="font-display">Pengaturan</span>
-                </a>
+                @if(auth()->user()->role === 'superadmin')
+                    <!-- User Management -->
+                    <a href="{{ route('users.index') }}"
+                        class="nav-link flex items-center gap-3.5 px-4 py-3 text-sm font-semibold {{ request()->routeIs('users.index') ? 'nav-link-active' : '' }}">
+                        <span class="w-6 h-6 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </span>
+                        <span class="font-display">Manajemen Staf</span>
+                    </a>
+
+                    <!-- Settings -->
+                    <a href="{{ route('settings') }}"
+                        class="nav-link flex items-center gap-3.5 px-4 py-3 text-sm font-semibold {{ request()->routeIs('settings') ? 'nav-link-active' : '' }}">
+                        <span class="w-6 h-6 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </span>
+                        <span class="font-display">Pengaturan</span>
+                    </a>
+                @endif
 
                 <!-- Profile -->
                 <a href="{{ route('profile.edit') }}"
@@ -243,7 +296,7 @@
             <div class="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
                 <div class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-800">
                     <div
-                        class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold bg-blue-600 text-white shrink-0">
+                        class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm {{ $roleTheme['bg'] }} transition-transform hover:scale-105 duration-200">
                         {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -277,14 +330,14 @@
                         function fireSpam() {
                             if (typeof Swal !== 'undefined') {
                                 Swal.fire({
-                                    icon: 'error',
-                                    title: 'BATAS LIMIT API!',
-                                    html: '<b>Kuota Google Gemini API telah habis!</b><br>Sistem sementara berjalan pada akurasi sangat rendah.<br><br>Harap segera perbarui kunci API di Menu Pengaturan!',
-                                    confirmButtonText: 'Tutup (Akan muncul lagi)',
+                                    icon: 'warning',
+                                    title: 'SISTEM MAINTENANCE',
+                                    html: '<b>🚨 Maintenance Terjadwal (Kuota API Habis)</b><br>Sistem OCR AI sedang tidak dapat membaca struk (Limit Tercapai).<br><br>Harap segera perbarui kunci API Gemini di Menu Pengaturan!',
+                                    confirmButtonText: 'Tutup Peringatan',
                                     confirmButtonColor: '#ef4444',
                                     allowOutsideClick: false,
                                     allowEscapeKey: false,
-                                    backdrop: `rgba(220, 38, 38, 0.4)`
+                                    backdrop: `rgba(220, 38, 38, 0.7)`
                                 }).then((result) => {
                                     if (result.isConfirmed) {
                                         setTimeout(fireSpam, 5000); // 5 Seconds SPAM loop!
@@ -325,11 +378,11 @@
                     </button>
 
                     <!-- Mobile Brand (shown only on mobile) -->
-                    <a href="{{ route('dashboard') }}" class="flex items-center gap-2 md:hidden">
-                        <img src="{{ asset('logo.png') }}" alt="Logo" class="w-7 h-7 object-contain drop-shadow-sm">
-                        <span class="text-sm font-bold font-display text-slate-900 dark:text-white">
-                            Receipt<span class="text-blue-600">Optima</span>
-                        </span>
+                    <a href="{{ route('dashboard') }}" class="flex items-center md:hidden pt-1">
+                        <img src="{{ asset('Logo app black.png') }}" alt="Logo Light"
+                            class="w-36 h-auto object-contain dark:hidden">
+                        <img src="{{ asset('Logo app.png') }}" alt="Logo Dark"
+                            class="w-36 h-auto object-contain hidden dark:block">
                     </a>
 
                     <!-- Desktop: Page breadcrumb -->
@@ -374,64 +427,53 @@
 
             <!-- ===== FLASH MESSAGES ===== -->
             @if(session('success') || session('error') || session('warning') || session('info'))
-                <div class="px-4 md:px-8 pt-6 space-y-3">
-                    @if(session('success'))
-                        <div x-data="{ show: true }" x-show="show"
-                            class="alert alert-success p-4 rounded-lg flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-3">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>{{ session('success') }}</span>
-                            </div>
-                            <button @click="show = false"
-                                class="text-xl leading-none opacity-70 hover:opacity-100">&times;</button>
-                        </div>
-                    @endif
-                    @if(session('error'))
-                        <div x-data="{ show: true }" x-show="show"
-                            class="alert alert-error p-4 rounded-lg flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-3">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>{{ session('error') }}</span>
-                            </div>
-                            <button @click="show = false"
-                                class="text-xl leading-none opacity-70 hover:opacity-100">&times;</button>
-                        </div>
-                    @endif
-                    @if(session('warning'))
-                        <div x-data="{ show: true }" x-show="show"
-                            class="alert alert-warning p-4 rounded-lg flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-3">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                                <span>{{ session('warning') }}</span>
-                            </div>
-                            <button @click="show = false"
-                                class="text-xl leading-none opacity-70 hover:opacity-100">&times;</button>
-                        </div>
-                    @endif
-                    @if(session('info'))
-                        <div x-data="{ show: true }" x-show="show"
-                            class="alert alert-info p-4 rounded-lg flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-3">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>{{ session('info') }}</span>
-                            </div>
-                            <button @click="show = false"
-                                class="text-xl leading-none opacity-70 hover:opacity-100">&times;</button>
-                        </div>
-                    @endif
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        if (typeof Swal !== 'undefined') {
+                            @if(session('success'))
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'BERHASIL!',
+                                    html: '{!! nl2br(e(session('success'))) !!}',
+                                    confirmButtonText: 'Oke, Mengerti',
+                                    confirmButtonColor: 'var(--brand-primary, #3b82f6)',
+                                    timer: 4500,
+                                    timerProgressBar: true
+                                });
+                            @endif
+
+                            @if(session('error'))
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'GAGAL / ERROR!',
+                                    html: '{!! nl2br(e(session('error'))) !!}',
+                                    confirmButtonText: 'Tutup',
+                                    confirmButtonColor: '#ef4444'
+                                });
+                            @endif
+
+                            @if(session('warning'))
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'PERHATIAN!',
+                                    html: '{!! nl2br(e(session('warning'))) !!}',
+                                    confirmButtonText: 'Mengerti',
+                                    confirmButtonColor: '#f59e0b'
+                                });
+                            @endif
+
+                            @if(session('info'))
+                                Swal.fire({
+                                    icon: 'info',
+                                    title: 'INFORMASI',
+                                    html: '{!! nl2br(e(session('info'))) !!}',
+                                    confirmButtonText: 'Tutup',
+                                    confirmButtonColor: '#3b82f6'
+                                });
+                            @endif
+                                                                                                }
+                    });
+                </script>
             @endif
             <!-- ===== MAIN SLOT ===== -->
             <main class="flex-1 p-4 md:p-8 has-bottom-nav">
@@ -466,16 +508,18 @@
         </a>
 
         <!-- Central Scan/Upload FAB -->
-        <div class="bottom-nav-fab-wrap">
-            <button type="button" @click="$dispatch('open-upload-modal')" class="bottom-nav-fab"
-                aria-label="Upload Struk Baru">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            </button>
-        </div>
+        @if(auth()->check() && auth()->user()->role === 'staff')
+            <div class="bottom-nav-fab-wrap">
+                <button type="button" @click="$dispatch('open-upload-modal')" class="bottom-nav-fab"
+                    aria-label="Upload Struk Baru">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+            </div>
+        @endif
 
         <!-- Settings -->
         <a href="{{ route('settings') }}" class="bottom-nav-item {{ request()->routeIs('settings') ? 'active' : '' }}">
@@ -538,8 +582,24 @@
                     if (el.__x) el.__x.$data.show = false;
                 });
             }, 5000);
+
+            // Global Loader handling
+            window.onload = function () {
+                // Sembunyikan loading screen ketika seluruh aset (gambar, css) selesai dimuat
+                window.dispatchEvent(new CustomEvent('stop-global-loading'));
+            };
+
+            window.addEventListener('beforeunload', function () {
+                // Tampilkan kembali loading screen ketika user menekan link / pindah halaman
+                window.dispatchEvent(new CustomEvent('start-global-loading'));
+            });
         });
     </script>
+
+    @if(auth()->check() && auth()->user()->role === 'staff')
+        @include('receipts.partials.upload-modal')
+    @endif
+
 </body>
 
 </html>

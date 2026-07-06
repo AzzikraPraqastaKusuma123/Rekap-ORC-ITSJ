@@ -38,12 +38,11 @@ class ReceiptWebController extends Controller
      */
     public function dashboard()
     {
-        $stats = $this->analyticsService->getDashboardStats();
         $recentTransactions = $this->receiptRepository->getRecent(5);
         $activityLogs = ActivityLog::with('user')->orderBy('created_at', 'desc')->limit(5)->get();
 
-        // ApexCharts compiled data
-        $spendingTrend = $this->analyticsService->getDailySpendingChartData(15); // last 15 days
+        $stats = $this->analyticsService->getDashboardStats();
+        $spendingTrend = $this->analyticsService->getDailySpendingChartData(15);
         $storeSpending = $this->analyticsService->getStoreSpendingChartData();
         $topProducts = $this->analyticsService->getTopProductsChartData(5);
 
@@ -62,7 +61,7 @@ class ReceiptWebController extends Controller
      */
     public function receiptsIndex(Request $request)
     {
-        $filters = $request->only(['search', 'store', 'start_date', 'end_date', 'sort_by', 'sort_order']);
+        $filters = $request->only(['search', 'store', 'start_date', 'end_date', 'sort_by', 'sort_order', 'status']);
         $receipts = $this->receiptRepository->getFiltered($filters, 9); // Paginate 9 per page
 
         $stores = $this->receiptRepository->getUniqueStores();
@@ -77,6 +76,18 @@ class ReceiptWebController extends Controller
         }
 
         return view('receipts.index', compact('receipts', 'stores', 'filters', 'editReceipt'));
+    }
+
+    /**
+     * Print Filtered Receipts natively via browser optimized CSS layout
+     */
+    public function printReport(Request $request)
+    {
+        $filters = $request->only(['search', 'store', 'start_date', 'end_date', 'sort_by', 'sort_order', 'status']);
+        // Override pagination to fetch a large subset suitable for printing
+        $receipts = $this->receiptRepository->getFiltered($filters, 1000);
+
+        return view('receipts.print', compact('receipts', 'filters'));
     }
 
     /**
@@ -117,6 +128,9 @@ class ReceiptWebController extends Controller
             // In case the user enters manual totals, else use computed
             $totalPrice = $request->input('total_price') ?: $computedTotal;
 
+            // RBAC Enforcement: Staff edits default to pending_approval. Admins remain verified.
+            $status = (Auth::user()->role === 'staff') ? 'pending_approval' : 'verified';
+
             $data = [
                 'store_name' => $request->input('store_name'),
                 'receipt_date' => $request->input('receipt_date'),
@@ -124,6 +138,7 @@ class ReceiptWebController extends Controller
                 'category' => $request->input('category') ?: 'Others',
                 'tax' => $request->input('tax') ?: 0,
                 'discount' => $request->input('discount') ?: 0,
+                'status' => $status
             ];
 
             $this->receiptRepository->update((int) $id, $data, $itemsData);
@@ -132,16 +147,67 @@ class ReceiptWebController extends Controller
             $this->analyticsService->getDashboardStats();
 
             // Log activity
+            $logMsg = ($status === 'pending_approval')
+                ? "Receipt ID {$id} edited by Staff " . Auth::user()->name . " (Pending Approval)"
+                : "Receipt ID {$id} manually verified by " . Auth::user()->name;
+
             ActivityLog::create([
                 'user_id' => Auth::id(),
-                'activity' => 'Manual Verification',
-                'description' => "Receipt ID {$id} has been manually updated/verified by " . Auth::user()->name
+                'activity' => 'Manual Edit',
+                'description' => $logMsg
             ]);
 
-            return redirect()->back()->with('success', 'Receipt successfully verified and updated.');
+            return redirect()->back()->with(
+                'success',
+                $status === 'pending_approval'
+                ? 'Struk berhasil dirubah. Menunggu ACC Direktur Keuangan.'
+                : 'Struk berhasil diperbarui.'
+            );
         } catch (\Exception $e) {
             Log::error("Failed to manually verify receipt: " . $e->getMessage());
             return redirect()->back()->with('error', 'Failed to update receipt: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Approve Receipt (Finance / Admin)
+     */
+    public function approveReceipt($id)
+    {
+        try {
+            $this->receiptRepository->update((int) $id, ['status' => 'verified'], []);
+            $this->analyticsService->getDashboardStats();
+
+            ActivityLog::create([
+                'user_id' => Auth::id(),
+                'activity' => 'Receipt Approved',
+                'description' => "Receipt ID {$id} was approved by " . Auth::user()->name
+            ]);
+
+            return redirect()->back()->with('success', 'Struk berhasil disahkan (ACC).');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal ACC struk: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Reject Receipt (Finance / Admin)
+     */
+    public function rejectReceipt($id)
+    {
+        try {
+            $this->receiptRepository->update((int) $id, ['status' => 'pending_correction'], []);
+            $this->analyticsService->getDashboardStats();
+
+            ActivityLog::create([
+                'user_id' => Auth::id(),
+                'activity' => 'Receipt Rejected',
+                'description' => "Receipt ID {$id} was rejected by " . Auth::user()->name
+            ]);
+
+            return redirect()->back()->with('success', 'Struk Ditolak dan dikembalikan ke staf.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal menolak struk: ' . $e->getMessage());
         }
     }
 
@@ -527,14 +593,20 @@ class ReceiptWebController extends Controller
      */
     public function apiDashboardStats()
     {
-        $stats = $this->analyticsService->getDashboardStats();
         $recentTransactions = $this->receiptRepository->getRecent(5);
         $activityLogs = ActivityLog::with('user')->orderBy('created_at', 'desc')->limit(5)->get();
 
-        // ApexCharts compiled data
-        $spendingTrend = $this->analyticsService->getDailySpendingChartData(15);
-        $storeSpending = $this->analyticsService->getStoreSpendingChartData();
-        $topProducts = $this->analyticsService->getTopProductsChartData(5);
+        $stats = [];
+        $spendingTrend = [];
+        $storeSpending = [];
+        $topProducts = [];
+
+        if (Auth::user()->role !== 'staff') {
+            $stats = $this->analyticsService->getDashboardStats();
+            $spendingTrend = $this->analyticsService->getDailySpendingChartData(15);
+            $storeSpending = $this->analyticsService->getStoreSpendingChartData();
+            $topProducts = $this->analyticsService->getTopProductsChartData(5);
+        }
 
         // Format dates and prepare custom HTML structures if needed to make the frontend replacement easy
         $recentTransactionsData = $recentTransactions->map(function ($tx) {

@@ -104,13 +104,13 @@ html.light #app-sidebar {
 
 /* Sidebar active link */
 html.dark .nav-link-active {
-    background-color: rgba(37, 99, 235, 0.15) !important;
-    color: #60a5fa !important;
+    background-color: color-mix(in srgb, var(--brand-primary) 15%, transparent) !important;
+    color: var(--brand-primary) !important;
     border-radius: 8px;
 }
 html.light .nav-link-active {
-    background-color: rgba(37, 99, 235, 0.1) !important;
-    color: #2563eb !important;
+    background-color: color-mix(in srgb, var(--brand-primary) 10%, transparent) !important;
+    color: var(--brand-primary) !important;
     border-radius: 8px;
 }
 
@@ -194,7 +194,7 @@ html.light #mobile-bottom-nav {
 html.dark .bottom-nav-item { color: var(--text-secondary-dark); }
 
 html.light .bottom-nav-item.active { color: var(--brand-primary); }
-html.dark .bottom-nav-item.active { color: #60a5fa; }
+html.dark .bottom-nav-item.active { color: var(--brand-primary); }
 
 .bottom-nav-item .nav-icon-wrap {
     display: flex;
@@ -206,8 +206,8 @@ html.dark .bottom-nav-item.active { color: #60a5fa; }
     transition: background-color var(--transition-fast);
 }
 
-html.light .bottom-nav-item.active .nav-icon-wrap { background-color: rgba(37, 99, 235, 0.1); }
-html.dark .bottom-nav-item.active .nav-icon-wrap { background-color: rgba(37, 99, 235, 0.2); }
+html.light .bottom-nav-item.active .nav-icon-wrap { background-color: color-mix(in srgb, var(--brand-primary) 10%, transparent); }
+html.dark .bottom-nav-item.active .nav-icon-wrap { background-color: color-mix(in srgb, var(--brand-primary) 20%, transparent); }
 
 .bottom-nav-item svg { width: 22px; height: 22px; }
 
@@ -403,7 +403,7 @@ html.dark .data-table td { border-bottom-color: var(--border-dark); }
 html.dark .badge-success { background-color: rgba(22, 163, 74, 0.2); color: #4ade80; }
 html.dark .badge-warning { background-color: rgba(202, 138, 4, 0.2); color: #facc15; }
 html.dark .badge-error   { background-color: rgba(220, 38, 38, 0.2); color: #f87171; }
-html.dark .badge-info    { background-color: rgba(37, 99, 235, 0.2); color: #60a5fa; }
+html.dark .badge-info    { background-color: color-mix(in srgb, var(--brand-primary) 20%, transparent); color: var(--brand-primary); }
 
 /* ======================================================
    MOBILE UTILITIES
